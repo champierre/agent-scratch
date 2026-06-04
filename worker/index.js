@@ -6,10 +6,9 @@
 //   npx wrangler deploy
 //   npx wrangler secret put ANTHROPIC_API_KEY   # 支出上限付きのキーを推奨
 
+// お試しモードは最安のHaikuのみ許可
 const ALLOWED_MODELS = [
-    'claude-haiku-4-5-20251001',
-    'claude-sonnet-4-6',
-    'claude-opus-4-8'
+    'claude-haiku-4-5-20251001'
 ];
 
 const MAX_TOKENS_LIMIT = 16000;

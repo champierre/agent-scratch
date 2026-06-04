@@ -110,7 +110,7 @@ const ChatPanel = ({
                 )}
                 {trialMode && (
                     <div className="as-chat-trial" onClick={onOpenSettings}>
-                        🎁 お試しモードで利用中(共有キー・制限あり)。⚙️ から自分の API キーを設定できます
+                        🎁 お試しモードで利用中(Haiku・制限あり)。⚙️ から自分の API キーを設定できます
                     </div>
                 )}
                 {!canSend && (

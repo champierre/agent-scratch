@@ -69,6 +69,8 @@ export const runAgent = async ({
 }) => {
     // キー未入力なら試用プロキシ経由(キーはWorker側のSecretが使われる)
     const useTrial = !apiKey && isTrialAvailable();
+    // お試しモードは最安のHaikuに固定(Worker側でも同じ制限をかけている)
+    const model = useTrial ? DEFAULT_MODEL : getModel();
     const client = new Anthropic({
         apiKey: useTrial ? 'trial-mode' : apiKey,
         ...(useTrial ? {baseURL: TRIAL_PROXY_URL} : {}),
@@ -93,7 +95,7 @@ export const runAgent = async ({
         let response;
         try {
             response = await client.messages.create({
-                model: getModel(),
+                model,
                 max_tokens: MAX_TOKENS,
                 system,
                 tools,
@@ -123,7 +125,7 @@ export const runAgent = async ({
         apiMessages.push({role: 'assistant', content: response.content});
 
         if (onUsage && response.usage) {
-            onUsage(estimateCost(getModel(), response.usage));
+            onUsage(estimateCost(model, response.usage));
         }
 
         // テキスト部分をUIへ

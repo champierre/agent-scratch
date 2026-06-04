@@ -1,16 +1,21 @@
 import React, {useCallback, useRef, useState} from 'react';
 import ChatPanelComponent from '../components/chat-panel/chat-panel.jsx';
 import ApiKeyModal from '../components/api-key-modal/api-key-modal.jsx';
+import DisclosureModal from '../components/disclosure-modal/disclosure-modal.jsx';
 import {runAgent, AuthError, getModel, setModel, isTrialAvailable} from '../agent/agent-loop';
 
 const STORAGE_KEY = 'agent-scratch-api-key';
 const COST_STORAGE_KEY = 'agent-scratch-total-cost';
+const DISCLOSURE_STORAGE_KEY = 'agent-scratch-disclosure-accepted';
 
 const ChatPanel = ({vm}) => {
     const [messages, setMessages] = useState([]);
     const [running, setRunning] = useState(false);
     const [apiKey, setApiKey] = useState(() => localStorage.getItem(STORAGE_KEY) || '');
     const [showModal, setShowModal] = useState(false);
+    const [showDisclosure, setShowDisclosure] = useState(
+        () => !localStorage.getItem(DISCLOSURE_STORAGE_KEY)
+    );
     const [sessionCost, setSessionCost] = useState(0);
     const [totalCost, setTotalCost] = useState(
         () => parseFloat(localStorage.getItem(COST_STORAGE_KEY)) || 0
@@ -107,6 +112,14 @@ const ChatPanel = ({vm}) => {
                 onStop={handleStop}
                 onOpenSettings={() => setShowModal(true)}
             />
+            {showDisclosure && (
+                <DisclosureModal
+                    onAccept={() => {
+                        localStorage.setItem(DISCLOSURE_STORAGE_KEY, '1');
+                        setShowDisclosure(false);
+                    }}
+                />
+            )}
             {showModal && (
                 <ApiKeyModal
                     initialApiKey={apiKey}
