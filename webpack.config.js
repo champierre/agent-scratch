@@ -33,6 +33,11 @@ module.exports = (env, argv) => ({
             {
                 test: /\.css$/,
                 use: ['style-loader', 'css-loader']
+            },
+            {
+                // fetch-worker の publicPath ハードコード("/")をサブパス対応に修正
+                test: /@scratch[\/\\]scratch-gui[\/\\]dist[\/\\]scratch-gui\.js$/,
+                use: [path.resolve(__dirname, 'tools/fix-nested-publicpath-loader.js')]
             }
         ]
     },
