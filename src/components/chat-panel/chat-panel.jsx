@@ -1,19 +1,65 @@
 import React, {useEffect, useRef, useState} from 'react';
 import './chat-panel.css';
 
-// **太字** と `コード` だけの簡易マークダウン描画(HTMLは使わずReact要素に変換)
-const renderMarkdownLite = text => {
+// 行内マークダウン(**太字** と `コード`) をReact要素に変換
+const renderInline = (text, keyPrefix) => {
     const parts = [];
     text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).forEach((seg, i) => {
         if (/^\*\*[^*]+\*\*$/.test(seg)) {
-            parts.push(<strong key={i}>{seg.slice(2, -2)}</strong>);
+            parts.push(<strong key={`${keyPrefix}-${i}`}>{seg.slice(2, -2)}</strong>);
         } else if (/^`[^`]+`$/.test(seg)) {
-            parts.push(<code key={i}>{seg.slice(1, -1)}</code>);
+            parts.push(<code key={`${keyPrefix}-${i}`}>{seg.slice(1, -1)}</code>);
         } else if (seg) {
             parts.push(seg);
         }
     });
     return parts;
+};
+
+// 行単位のブロック要素(見出し・リスト・区切り線)も処理するマークダウン描画
+const renderMarkdownLite = text => {
+    const lines = text.split('\n');
+    const result = [];
+    let listItems = [];
+
+    const flushList = () => {
+        if (listItems.length > 0) {
+            result.push(<ul key={`ul-${result.length}`} style={{margin: '4px 0', paddingLeft: '18px'}}>{listItems}</ul>);
+            listItems = [];
+        }
+    };
+
+    lines.forEach((line, i) => {
+        const h2 = line.match(/^##\s+(.+)/);
+        const h3 = line.match(/^###\s+(.+)/);
+        const li = line.match(/^[-*]\s+(.+)/);
+        const ol = line.match(/^\d+\.\s+(.+)/);
+        const hr = /^---+$/.test(line.trim());
+
+        if (h2) {
+            flushList();
+            result.push(<strong key={i} style={{display: 'block', fontSize: '14px', marginTop: '6px'}}>{renderInline(h2[1], i)}</strong>);
+        } else if (h3) {
+            flushList();
+            result.push(<strong key={i} style={{display: 'block', marginTop: '4px'}}>{renderInline(h3[1], i)}</strong>);
+        } else if (li) {
+            listItems.push(<li key={i}>{renderInline(li[1], i)}</li>);
+        } else if (ol) {
+            listItems.push(<li key={i}>{renderInline(ol[1], i)}</li>);
+        } else if (hr) {
+            flushList();
+            result.push(<hr key={i} style={{border: 'none', borderTop: '1px solid #ddd', margin: '6px 0'}} />);
+        } else {
+            flushList();
+            if (line === '') {
+                result.push(<br key={i} />);
+            } else {
+                result.push(<span key={i} style={{display: 'block'}}>{renderInline(line, i)}</span>);
+            }
+        }
+    });
+    flushList();
+    return result;
 };
 
 const MessageRow = ({message}) => {
