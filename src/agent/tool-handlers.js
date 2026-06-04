@@ -154,9 +154,15 @@ export const createToolHandlers = vm => ({
         return {added: backdrop_name};
     },
 
-    set_scripts: ({target, scripts}) => {
+    set_scripts: async ({target, scripts}) => {
         const t = findTarget(vm, target);
         const resolveVariable = makeVariableResolver(vm, t);
+
+        // スクリプト内に pen_ ブロックが含まれていたらペン拡張を自動ロード
+        const scriptJson = JSON.stringify(scripts);
+        if (scriptJson.includes('"pen_') && !vm.runtime._extensions.isExtensionLoaded('pen')) {
+            await vm.extensionManager.loadExtensionURL('pen');
+        }
 
         // 失敗時ロールバック用スナップショット
         const blocksSnapshot = {...t.blocks._blocks};

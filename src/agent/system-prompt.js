@@ -102,6 +102,7 @@ ${opcodeDocs()}
 - 色(color)は "#rrggbb" 形式
 
 # 設計のヒント
+- ペンブロック(pen_penDown, pen_penUp, pen_stamp 等)はそのまま set_scripts で使える。手動での拡張追加は不要
 - ステージ(背景)のスクリプトは target: "Stage" で set_scripts する
 - ゲームを作るときは、スコア変数・ゲームオーバー処理・効果音などを工夫して入れると喜ばれる
 - スプライトの初期位置は set_sprite_properties か、スクリプト内の motion_gotoxy で設定する
