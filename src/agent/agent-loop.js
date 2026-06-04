@@ -1,6 +1,6 @@
 // Anthropic Messages API の手動 tool use ループ
 import Anthropic from '@anthropic-ai/sdk';
-import {TOOLS, summarizeToolCall} from './tools';
+import {TOOLS, summarizeToolCall, draftingLabel} from './tools';
 import {SYSTEM_PROMPT} from './system-prompt';
 import {createToolHandlers, ToolError} from './tool-handlers';
 
@@ -68,6 +68,7 @@ export const runAgent = async ({
     onAssistantText,
     onToolStart,
     onToolEnd,
+    onToolDrafting,
     onUsage
 }) => {
     // キー未入力なら試用プロキシ経由(キーはWorker側のSecretが使われる)
@@ -111,6 +112,27 @@ export const runAgent = async ({
             }, {signal});
             if (onAssistantDelta) {
                 stream.on('text', delta => onAssistantDelta(delta));
+            }
+            // ツール入力(JSON)の生成中は本文テキストが流れないため、
+            // 「○○を書いています...(n文字)」の進捗をUIへ送る
+            if (onToolDrafting) {
+                let draftLabel = null;
+                let draftChars = 0;
+                stream.on('streamEvent', event => {
+                    if (event.type === 'content_block_start' &&
+                        event.content_block.type === 'tool_use') {
+                        draftLabel = draftingLabel(event.content_block.name);
+                        draftChars = 0;
+                        onToolDrafting(draftLabel, 0);
+                    } else if (event.type === 'content_block_delta' &&
+                        event.delta.type === 'input_json_delta' && draftLabel) {
+                        draftChars += event.delta.partial_json.length;
+                        onToolDrafting(draftLabel, draftChars);
+                    } else if (event.type === 'content_block_stop' && draftLabel) {
+                        draftLabel = null;
+                        onToolDrafting(null, 0);
+                    }
+                });
             }
             // 完全なMessage(thinking/tool_useブロック込み)を取得
             response = await stream.finalMessage();

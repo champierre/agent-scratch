@@ -5,7 +5,9 @@ import {createToolHandlers} from '../agent/tool-handlers';
 import {runAgent, isTrialAvailable} from '../agent/agent-loop';
 
 export const maybeRunAgentTest = vm => {
-    if (!new URLSearchParams(window.location.search).has('agenttest')) return;
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('agenttest')) return;
+    const prompt = params.get('prompt') || 'ネコが旗をクリックしたら右に動き続けるようにして';
     const run = async () => {
         console.log('[agenttest] start (trial available:', isTrialAvailable(), ')');
         let deltaCount = 0;
@@ -15,7 +17,7 @@ export const maybeRunAgentTest = vm => {
             await runAgent({
                 apiKey: '',
                 vm,
-                userText: 'ネコが旗をクリックしたら右に動き続けるようにして',
+                userText: prompt,
                 apiMessages: [],
                 onAssistantStart: () => console.log('[agenttest] turn start at', Date.now() - startedAt, 'ms'),
                 onAssistantDelta: delta => {
@@ -28,6 +30,12 @@ export const maybeRunAgentTest = vm => {
                 onAssistantText: t => console.log('[agenttest] text:', t),
                 onToolStart: s => console.log('[agenttest] tool start:', s),
                 onToolEnd: ok => console.log('[agenttest] tool end:', ok),
+                onToolDrafting: (label, chars) => {
+                    // 1000文字ごとに進捗を出す(ログ洪水防止)
+                    if (label && (chars === 0 || chars % 1000 < 30)) {
+                        console.log('[agenttest] drafting:', label, chars);
+                    }
+                },
                 onUsage: cost => console.log('[agenttest] usage cost: $' + cost.toFixed(5))
             });
             console.log('[agenttest] PASSED. deltas:', deltaCount, 'elapsed:', Date.now() - startedAt, 'ms');

@@ -16,6 +16,8 @@ const ChatPanel = ({vm}) => {
     const [showDisclosure, setShowDisclosure] = useState(
         () => !localStorage.getItem(DISCLOSURE_STORAGE_KEY)
     );
+    // ツール入力生成中の進捗表示("ブロックを書いています (1200文字)" など)
+    const [drafting, setDrafting] = useState(null);
     const [sessionCost, setSessionCost] = useState(0);
     const [totalCost, setTotalCost] = useState(
         () => parseFloat(localStorage.getItem(COST_STORAGE_KEY)) || 0
@@ -97,8 +99,14 @@ const ChatPanel = ({vm}) => {
                 onAssistantStart: startAssistant,
                 onAssistantDelta: appendAssistantDelta,
                 onAssistantText: t => appendMessage({role: 'assistant', text: t}),
-                onToolStart: summary => appendMessage({role: 'tool', text: summary, status: 'running'}),
+                onToolStart: summary => {
+                    setDrafting(null);
+                    appendMessage({role: 'tool', text: summary, status: 'running'});
+                },
                 onToolEnd: ok => finishLastTool(ok),
+                onToolDrafting: (label, chars) => {
+                    setDrafting(label ? {label, chars} : null);
+                },
                 onUsage: handleUsage
             });
         } catch (e) {
@@ -112,6 +120,7 @@ const ChatPanel = ({vm}) => {
             }
         } finally {
             setRunning(false);
+            setDrafting(null);
             finishStreaming();
             abortRef.current = null;
         }
@@ -133,6 +142,7 @@ const ChatPanel = ({vm}) => {
             <ChatPanelComponent
                 messages={messages}
                 running={running}
+                drafting={drafting}
                 hasApiKey={!!apiKey}
                 trialMode={!apiKey && isTrialAvailable()}
                 sessionCost={sessionCost}

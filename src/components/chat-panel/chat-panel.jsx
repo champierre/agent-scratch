@@ -47,17 +47,22 @@ const MessageRow = ({message}) => {
 
 const formatCost = cost => (cost >= 0.01 ? `$${cost.toFixed(2)}` : `$${cost.toFixed(4)}`);
 
-// 応答待ちインジケータ
-const ThinkingRow = () => (
+// 応答待ちインジケータ(ツール入力の生成中はその進捗を表示)
+const ThinkingRow = ({drafting}) => (
     <div className="as-chat-message as-chat-tool">
         <span className="as-chat-tool-spinner" />
-        <span className="as-chat-tool-text">考え中...</span>
+        <span className="as-chat-tool-text">
+            {drafting ?
+                `${drafting.label}...${drafting.chars > 0 ? ` (${drafting.chars}文字)` : ''}` :
+                '考え中...'}
+        </span>
     </div>
 );
 
 const ChatPanel = ({
     messages,
     running,
+    drafting,
     hasApiKey,
     trialMode,
     sessionCost,
@@ -78,11 +83,12 @@ const ChatPanel = ({
     }, [messages, running]);
 
     // ストリーミング表示中・ツール実行中は「考え中...」を重ねて出さない
+    // (ただしツール入力の生成中(drafting)は進捗として常に表示)
     const lastMessage = messages[messages.length - 1];
-    const showThinking = running && !(
+    const showThinking = running && (drafting || !(
         (lastMessage && lastMessage.role === 'assistant' && lastMessage.streaming) ||
         (lastMessage && lastMessage.role === 'tool' && lastMessage.status === 'running')
-    );
+    ));
 
     const submit = () => {
         const text = input.trim();
@@ -116,7 +122,7 @@ const ChatPanel = ({
                     </div>
                 )}
                 {messages.map((m, i) => <MessageRow key={i} message={m} />)}
-                {showThinking && <ThinkingRow />}
+                {showThinking && <ThinkingRow drafting={drafting} />}
             </div>
             <div className="as-chat-input-area">
                 {hasApiKey && (
