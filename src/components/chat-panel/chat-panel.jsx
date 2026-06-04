@@ -67,9 +67,11 @@ const ChatPanel = ({
     trialMode,
     sessionCost,
     totalCost,
+    blocksEnabled,
     onSend,
     onStop,
-    onOpenSettings
+    onOpenSettings,
+    onToggleBlocks
 }) => {
     const canSend = hasApiKey || trialMode;
     const [input, setInput] = useState('');
@@ -140,11 +142,20 @@ const ChatPanel = ({
                         ⚙️ をクリックして Anthropic API キーを設定してください
                     </div>
                 )}
+                <div className="as-chat-toggle-row">
+                    <span className="as-chat-toggle-desc">ブロック操作</span>
+                    <span
+                        className={`as-chat-toggle-switch${blocksEnabled ? ' as-chat-toggle-on' : ''}`}
+                        onClick={onToggleBlocks}
+                    >
+                        <span className="as-chat-toggle-knob" />
+                    </span>
+                </div>
                 <textarea
                     className="as-chat-input"
                     value={input}
                     placeholder="指示を入力..."
-                    rows={3}
+                    rows={5}
                     disabled={!canSend}
                     onChange={e => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}

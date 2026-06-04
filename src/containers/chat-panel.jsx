@@ -2,7 +2,7 @@ import React, {useCallback, useRef, useState} from 'react';
 import ChatPanelComponent from '../components/chat-panel/chat-panel.jsx';
 import ApiKeyModal from '../components/api-key-modal/api-key-modal.jsx';
 import DisclosureModal from '../components/disclosure-modal/disclosure-modal.jsx';
-import {runAgent, AuthError, getModel, setModel, isTrialAvailable} from '../agent/agent-loop';
+import {runAgent, AuthError, getModel, setModel, isTrialAvailable, getDeepSeekApiKey, setDeepSeekApiKey, isDeepSeekModel} from '../agent/agent-loop';
 
 const STORAGE_KEY = 'agent-scratch-api-key';
 const COST_STORAGE_KEY = 'agent-scratch-total-cost';
@@ -12,6 +12,8 @@ const ChatPanel = ({vm}) => {
     const [messages, setMessages] = useState([]);
     const [running, setRunning] = useState(false);
     const [apiKey, setApiKey] = useState(() => localStorage.getItem(STORAGE_KEY) || '');
+    const [deepseekApiKey, setDeepseekApiKeyState] = useState(() => getDeepSeekApiKey());
+    const [blocksEnabled, setBlocksEnabled] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [showDisclosure, setShowDisclosure] = useState(
         () => !localStorage.getItem(DISCLOSURE_STORAGE_KEY)
@@ -96,6 +98,7 @@ const ChatPanel = ({vm}) => {
                 userText: text,
                 apiMessages: apiMessagesRef.current,
                 signal: controller.signal,
+                blocksEnabled,
                 onAssistantStart: startAssistant,
                 onAssistantDelta: appendAssistantDelta,
                 onAssistantText: t => appendMessage({role: 'assistant', text: t}),
@@ -130,10 +133,14 @@ const ChatPanel = ({vm}) => {
         if (abortRef.current) abortRef.current.abort();
     }, []);
 
-    const handleSaveApiKey = useCallback((key, model) => {
+    const handleSaveApiKey = useCallback((key, model, dsKey) => {
         localStorage.setItem(STORAGE_KEY, key);
         setApiKey(key);
         if (model) setModel(model);
+        if (dsKey !== undefined) {
+            setDeepSeekApiKey(dsKey);
+            setDeepseekApiKeyState(dsKey);
+        }
         setShowModal(false);
     }, []);
 
@@ -143,13 +150,15 @@ const ChatPanel = ({vm}) => {
                 messages={messages}
                 running={running}
                 drafting={drafting}
-                hasApiKey={!!apiKey}
-                trialMode={!apiKey && isTrialAvailable()}
+                hasApiKey={isDeepSeekModel(getModel()) ? !!deepseekApiKey : !!apiKey}
+                trialMode={!apiKey && !deepseekApiKey && isTrialAvailable()}
                 sessionCost={sessionCost}
                 totalCost={totalCost}
+                blocksEnabled={blocksEnabled}
                 onSend={handleSend}
                 onStop={handleStop}
                 onOpenSettings={() => setShowModal(true)}
+                onToggleBlocks={() => setBlocksEnabled(v => !v)}
             />
             {showDisclosure && (
                 <DisclosureModal
@@ -162,6 +171,7 @@ const ChatPanel = ({vm}) => {
             {showModal && (
                 <ApiKeyModal
                     initialApiKey={apiKey}
+                    initialDeepSeekApiKey={deepseekApiKey}
                     initialModel={getModel()}
                     onSave={handleSaveApiKey}
                     onClose={() => setShowModal(false)}

@@ -15,6 +15,9 @@ const SCRIPTS_SCHEMA = {
     }
 };
 
+// ブロック操作に関わるツール名の集合
+export const BLOCK_TOOL_NAMES = new Set(['set_scripts']);
+
 export const TOOLS = [
     {
         name: 'get_project_state',

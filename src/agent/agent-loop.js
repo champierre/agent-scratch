@@ -1,6 +1,7 @@
 // Anthropic Messages API の手動 tool use ループ
 import Anthropic from '@anthropic-ai/sdk';
-import {TOOLS, summarizeToolCall, draftingLabel} from './tools';
+import OpenAI from 'openai';
+import {TOOLS, BLOCK_TOOL_NAMES, summarizeToolCall, draftingLabel} from './tools';
 import {SYSTEM_PROMPT} from './system-prompt';
 import {createToolHandlers, ToolError} from './tool-handlers';
 
@@ -11,15 +12,22 @@ const TRIAL_PROXY_URL = process.env.TRIAL_PROXY_URL;
 export const isTrialAvailable = () => Boolean(TRIAL_PROXY_URL);
 
 const MODEL_STORAGE_KEY = 'agent-scratch-model';
-export const DEFAULT_MODEL = 'claude-haiku-4-5-20251001'; // 最安モデルをデフォルトに
+const DEEPSEEK_API_KEY_STORAGE_KEY = 'agent-scratch-deepseek-api-key';
+export const DEFAULT_MODEL = 'deepseek-chat'; // デフォルトモデル
+export const TRIAL_MODEL = 'deepseek-chat';   // お試しモードで使うモデル
 export const getModel = () => localStorage.getItem(MODEL_STORAGE_KEY) || DEFAULT_MODEL;
 export const setModel = model => localStorage.setItem(MODEL_STORAGE_KEY, model);
+export const getDeepSeekApiKey = () => localStorage.getItem(DEEPSEEK_API_KEY_STORAGE_KEY) || '';
+export const setDeepSeekApiKey = key => localStorage.setItem(DEEPSEEK_API_KEY_STORAGE_KEY, key);
+export const isDeepSeekModel = model => model && model.startsWith('deepseek-');
 
 // 100万トークンあたりのUSD単価(概算用)。キャッシュ書込は入力の1.25倍、読出は0.1倍
 const PRICING = {
     'claude-opus-4-8': {input: 5, output: 25},
     'claude-sonnet-4-6': {input: 3, output: 15},
-    'claude-haiku-4-5-20251001': {input: 1, output: 5}
+    'claude-haiku-4-5-20251001': {input: 1, output: 5},
+    'deepseek-chat': {input: 0.27, output: 1.1},
+    'deepseek-reasoner': {input: 0.55, output: 2.19}
 };
 
 export const estimateCost = (model, usage) => {
@@ -53,6 +61,202 @@ const moveCacheMarker = messages => {
     }
 };
 
+// Anthropic形式のツール定義 → OpenAI形式に変換
+const toOpenAITools = tools => tools.map(({name, description, input_schema}) => ({
+    type: 'function',
+    function: {name, description, parameters: input_schema}
+}));
+
+// OpenAI形式の会話履歴をAnthropicのapiMessagesに追加するためのアダプタ
+// ここではOpenAI形式のメッセージ配列を別途管理する
+const anthropicToOpenAIMessages = messages => {
+    const result = [];
+    for (const msg of messages) {
+        if (msg.role === 'user') {
+            // tool_result を含む場合 → tool メッセージ群に変換
+            const toolResults = Array.isArray(msg.content)
+                ? msg.content.filter(b => b.type === 'tool_result')
+                : [];
+            const textBlocks = Array.isArray(msg.content)
+                ? msg.content.filter(b => b.type === 'text')
+                : [];
+            for (const tr of toolResults) {
+                result.push({role: 'tool', tool_call_id: tr.tool_use_id, content: tr.content});
+            }
+            if (textBlocks.length > 0) {
+                result.push({role: 'user', content: textBlocks.map(b => b.text).join('\n')});
+            }
+        } else if (msg.role === 'assistant') {
+            const textBlocks = Array.isArray(msg.content)
+                ? msg.content.filter(b => b.type === 'text')
+                : [];
+            const toolUses = Array.isArray(msg.content)
+                ? msg.content.filter(b => b.type === 'tool_use')
+                : [];
+            const text = textBlocks.map(b => b.text).join('\n') || null;
+            const tool_calls = toolUses.length > 0
+                ? toolUses.map(b => ({
+                    id: b.id,
+                    type: 'function',
+                    function: {name: b.name, arguments: JSON.stringify(b.input)}
+                }))
+                : undefined;
+            result.push({role: 'assistant', content: text, ...(tool_calls ? {tool_calls} : {})});
+        }
+    }
+    return result;
+};
+
+/**
+ * DeepSeek (OpenAI互換) エージェントループ
+ */
+const runDeepSeekAgent = async ({
+    deepseekApiKey,
+    baseURL,
+    model: modelOverride,
+    vm,
+    userText,
+    apiMessages,
+    signal,
+    blocksEnabled,
+    onAssistantStart,
+    onAssistantDelta,
+    onAssistantText,
+    onToolStart,
+    onToolEnd,
+    onToolDrafting,
+    onUsage
+}) => {
+    const model = modelOverride || getModel();
+    const client = new OpenAI({
+        apiKey: deepseekApiKey,
+        baseURL: baseURL || 'https://api.deepseek.com',
+        dangerouslyAllowBrowser: true,
+        timeout: REQUEST_TIMEOUT_MS,
+        maxRetries: 1
+    });
+    const handlers = createToolHandlers(vm);
+    const activeTools = blocksEnabled ? TOOLS : TOOLS.filter(t => !BLOCK_TOOL_NAMES.has(t.name));
+    const oaiTools = toOpenAITools(activeTools);
+    const systemMessages = [{role: 'system', content: SYSTEM_PROMPT}];
+
+    apiMessages.push({role: 'user', content: [{type: 'text', text: userText}]});
+
+    for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+        if (signal && signal.aborted) return;
+
+        const oaiMessages = anthropicToOpenAIMessages(apiMessages);
+
+        let assistantText = '';
+        let toolCalls = [];
+
+        try {
+            if (onAssistantStart) onAssistantStart();
+            const stream = await client.chat.completions.create({
+                model,
+                max_tokens: MAX_TOKENS,
+                messages: [...systemMessages, ...oaiMessages],
+                tools: oaiTools,
+                tool_choice: 'auto',
+                stream: true
+            }, {signal});
+
+            // ストリーミングでテキストとtool_callsを収集
+            const partialToolCalls = {};
+            for await (const chunk of stream) {
+                if (signal && signal.aborted) return;
+                const delta = chunk.choices[0]?.delta;
+                if (!delta) continue;
+
+                if (delta.content) {
+                    assistantText += delta.content;
+                    if (onAssistantDelta) onAssistantDelta(delta.content);
+                }
+                if (delta.tool_calls) {
+                    for (const tc of delta.tool_calls) {
+                        if (!partialToolCalls[tc.index]) {
+                            partialToolCalls[tc.index] = {id: '', type: 'function', function: {name: '', arguments: ''}};
+                            if (onToolDrafting && tc.function?.name) {
+                                onToolDrafting(draftingLabel(tc.function.name), 0);
+                            }
+                        }
+                        const p = partialToolCalls[tc.index];
+                        if (tc.id) p.id += tc.id;
+                        if (tc.function?.name) p.function.name += tc.function.name;
+                        if (tc.function?.arguments) {
+                            p.function.arguments += tc.function.arguments;
+                            if (onToolDrafting) {
+                                onToolDrafting(draftingLabel(p.function.name), p.function.arguments.length);
+                            }
+                        }
+                    }
+                }
+                if (chunk.choices[0]?.finish_reason && onToolDrafting) {
+                    onToolDrafting(null, 0);
+                }
+
+                if (chunk.usage && onUsage) {
+                    onUsage(estimateCost(model, {
+                        input_tokens: chunk.usage.prompt_tokens,
+                        output_tokens: chunk.usage.completion_tokens
+                    }));
+                }
+            }
+            toolCalls = Object.values(partialToolCalls);
+        } catch (e) {
+            if (e?.status === 401 || e?.code === 'invalid_api_key') throw new AuthError(e.message);
+            if (e?.status === 429) throw new Error('混み合っています。少し待ってからもう一度試してください。');
+            if (e?.name === 'AbortError' || e?.name === 'APIUserAbortError') return;
+            throw e;
+        }
+
+        // apiMessages に assistant の応答を追記 (Anthropic形式で統一管理)
+        const assistantContent = [];
+        if (assistantText) assistantContent.push({type: 'text', text: assistantText});
+        for (const tc of toolCalls) {
+            let input = {};
+            try { input = JSON.parse(tc.function.arguments); } catch { /* ignore */ }
+            assistantContent.push({type: 'tool_use', id: tc.id, name: tc.function.name, input});
+        }
+        apiMessages.push({role: 'assistant', content: assistantContent});
+
+        if (toolCalls.length === 0) return;
+
+        // ツール実行
+        const toolResults = [];
+        for (const tc of toolCalls) {
+            if (signal && signal.aborted) return;
+            let input = {};
+            try { input = JSON.parse(tc.function.arguments); } catch { /* ignore */ }
+            onToolStart(summarizeToolCall(tc.function.name, input));
+            let result;
+            let isError = false;
+            try {
+                const handler = handlers[tc.function.name];
+                if (!handler) throw new ToolError(`未知のツール: ${tc.function.name}`);
+                result = await handler(input);
+            } catch (e) {
+                isError = true;
+                result = {error: e.message};
+                if (!(e instanceof ToolError)) {
+                    console.error(`tool ${tc.function.name} failed:`, e); // eslint-disable-line no-console
+                }
+            }
+            onToolEnd(!isError);
+            toolResults.push({
+                type: 'tool_result',
+                tool_use_id: tc.id,
+                content: JSON.stringify(result),
+                ...(isError ? {is_error: true} : {})
+            });
+            await new Promise(resolve => setTimeout(resolve, 300));
+        }
+        apiMessages.push({role: 'user', content: toolResults});
+    }
+
+    onAssistantText('(ツール実行回数の上限に達したため停止しました。続きが必要なら指示してください)');
+};
+
 /**
  * エージェントループを実行する。
  * apiMessages は呼び出し側が保持する会話履歴(Anthropic形式)で、in-place に更新される。
@@ -63,6 +267,7 @@ export const runAgent = async ({
     userText,
     apiMessages,
     signal,
+    blocksEnabled = true,
     onAssistantStart,
     onAssistantDelta,
     onAssistantText,
@@ -71,13 +276,36 @@ export const runAgent = async ({
     onToolDrafting,
     onUsage
 }) => {
-    // キー未入力なら試用プロキシ経由(キーはWorker側のSecretが使われる)
-    const useTrial = !apiKey && isTrialAvailable();
-    // お試しモードは最安のHaikuに固定(Worker側でも同じ制限をかけている)
-    const model = useTrial ? DEFAULT_MODEL : getModel();
+    const model = getModel();
+
+    // お試しモード: キー未入力 + プロキシURL設定済み → DeepSeek プロキシ経由
+    const useTrial = !apiKey && !getDeepSeekApiKey() && isTrialAvailable();
+    if (useTrial) {
+        return runDeepSeekAgent({
+            deepseekApiKey: 'trial-mode',
+            baseURL: TRIAL_PROXY_URL,
+            model: TRIAL_MODEL,
+            vm, userText, apiMessages, signal, blocksEnabled,
+            onAssistantStart, onAssistantDelta, onAssistantText,
+            onToolStart, onToolEnd, onToolDrafting, onUsage
+        });
+    }
+
+    // DeepSeekモデルが選択されている場合は専用ループへ
+    if (isDeepSeekModel(model)) {
+        const deepseekApiKey = getDeepSeekApiKey();
+        if (!deepseekApiKey) throw new AuthError('DeepSeek APIキーが設定されていません。⚙️ から設定してください。');
+        return runDeepSeekAgent({
+            deepseekApiKey, vm, userText, apiMessages, signal, blocksEnabled,
+            onAssistantStart, onAssistantDelta, onAssistantText,
+            onToolStart, onToolEnd, onToolDrafting, onUsage
+        });
+    }
+
+    // Anthropic モデル
+    const effectiveModel = model;
     const client = new Anthropic({
-        apiKey: useTrial ? 'trial-mode' : apiKey,
-        ...(useTrial ? {baseURL: TRIAL_PROXY_URL} : {}),
+        apiKey,
         dangerouslyAllowBrowser: true,
         defaultHeaders: {'anthropic-dangerous-direct-browser-access': 'true'},
         timeout: REQUEST_TIMEOUT_MS,
@@ -87,8 +315,9 @@ export const runAgent = async ({
 
     // システムプロンプトとツール定義は固定 → prompt caching
     const system = [{type: 'text', text: SYSTEM_PROMPT, cache_control: {type: 'ephemeral'}}];
-    const tools = TOOLS.map((tool, i) =>
-        (i === TOOLS.length - 1 ? {...tool, cache_control: {type: 'ephemeral'}} : tool)
+    const activeTools = blocksEnabled ? TOOLS : TOOLS.filter(t => !BLOCK_TOOL_NAMES.has(t.name));
+    const tools = activeTools.map((tool, i) =>
+        (i === activeTools.length - 1 ? {...tool, cache_control: {type: 'ephemeral'}} : tool)
     );
 
     apiMessages.push({role: 'user', content: [{type: 'text', text: userText}]});
@@ -103,7 +332,7 @@ export const runAgent = async ({
             // ストリーミングで呼び出し、textの増分をUIへ逐次反映する
             if (onAssistantStart) onAssistantStart();
             const stream = client.messages.stream({
-                model,
+                model: effectiveModel,
                 max_tokens: MAX_TOKENS,
                 system,
                 tools,
@@ -169,7 +398,7 @@ export const runAgent = async ({
         apiMessages.push({role: 'assistant', content: response.content});
 
         if (onUsage && response.usage) {
-            onUsage(estimateCost(model, response.usage));
+            onUsage(estimateCost(effectiveModel, response.usage));
         }
 
         if (response.stop_reason !== 'tool_use') {
