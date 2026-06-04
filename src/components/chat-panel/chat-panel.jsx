@@ -122,6 +122,9 @@ const ChatPanel = ({
     const canSend = hasApiKey || trialMode;
     const [input, setInput] = useState('');
     const historyRef = useRef(null);
+    const sentHistory = useRef([]);   // 送信済みテキストの履歴
+    const historyIndex = useRef(-1);  // -1 = 現在の入力、0以上 = 履歴参照中
+    const savedInput = useRef('');    // 履歴をたどる前の入力を退避
 
     useEffect(() => {
         const el = historyRef.current;
@@ -141,6 +144,9 @@ const ChatPanel = ({
     const submit = () => {
         const text = input.trim();
         if (!text || running) return;
+        sentHistory.current = [text, ...sentHistory.current].slice(0, 100);
+        historyIndex.current = -1;
+        savedInput.current = '';
         setInput('');
         onSend(text);
     };
@@ -149,6 +155,20 @@ const ChatPanel = ({
         if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
             submit();
+            return;
+        }
+        const history = sentHistory.current;
+        if (e.key === 'ArrowUp' && e.target.selectionStart === 0 && history.length > 0) {
+            e.preventDefault();
+            if (historyIndex.current === -1) savedInput.current = input;
+            const next = Math.min(historyIndex.current + 1, history.length - 1);
+            historyIndex.current = next;
+            setInput(history[next]);
+        } else if (e.key === 'ArrowDown' && historyIndex.current >= 0) {
+            e.preventDefault();
+            const next = historyIndex.current - 1;
+            historyIndex.current = next;
+            setInput(next === -1 ? savedInput.current : history[next]);
         }
     };
 
