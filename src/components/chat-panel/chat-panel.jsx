@@ -1,6 +1,21 @@
 import React, {useEffect, useRef, useState} from 'react';
 import './chat-panel.css';
 
+// **太字** と `コード` だけの簡易マークダウン描画(HTMLは使わずReact要素に変換)
+const renderMarkdownLite = text => {
+    const parts = [];
+    text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).forEach((seg, i) => {
+        if (/^\*\*[^*]+\*\*$/.test(seg)) {
+            parts.push(<strong key={i}>{seg.slice(2, -2)}</strong>);
+        } else if (/^`[^`]+`$/.test(seg)) {
+            parts.push(<code key={i}>{seg.slice(1, -1)}</code>);
+        } else if (seg) {
+            parts.push(seg);
+        }
+    });
+    return parts;
+};
+
 const MessageRow = ({message}) => {
     if (message.role === 'tool') {
         return (
@@ -16,8 +31,15 @@ const MessageRow = ({message}) => {
     if (message.role === 'error') {
         return <div className="as-chat-message as-chat-error">{message.text}</div>;
     }
+    if (message.role === 'assistant') {
+        return (
+            <div className="as-chat-message as-chat-assistant">
+                {renderMarkdownLite(message.text)}
+            </div>
+        );
+    }
     return (
-        <div className={`as-chat-message ${message.role === 'user' ? 'as-chat-user' : 'as-chat-assistant'}`}>
+        <div className="as-chat-message as-chat-user">
             {message.text}
         </div>
     );

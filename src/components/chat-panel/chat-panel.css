@@ -68,6 +68,14 @@
     border-bottom-left-radius: 4px;
 }
 
+.as-chat-assistant code {
+    background: #f0f0f4;
+    border-radius: 4px;
+    padding: 1px 4px;
+    font-family: Menlo, Consolas, monospace;
+    font-size: 12px;
+}
+
 .as-chat-error {
     align-self: stretch;
     background: #ffe8e6;
