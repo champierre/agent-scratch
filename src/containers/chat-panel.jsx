@@ -127,7 +127,7 @@ const ChatPanel = ({vm}) => {
             finishStreaming();
             abortRef.current = null;
         }
-    }, [vm, apiKey, appendMessage, finishLastTool, handleUsage, startAssistant, appendAssistantDelta, finishStreaming]);
+    }, [vm, apiKey, blocksEnabled, appendMessage, finishLastTool, handleUsage, startAssistant, appendAssistantDelta, finishStreaming]);
 
     const handleStop = useCallback(() => {
         if (abortRef.current) abortRef.current.abort();
