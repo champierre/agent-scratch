@@ -2,6 +2,7 @@ import React, {useCallback, useEffect, useState} from 'react';
 import {useDispatch} from 'react-redux';
 import GUI, {AppStateHOC, setProjectId, defaultProjectId} from '@scratch/scratch-gui';
 import ChatPanel from './containers/chat-panel.jsx';
+import {maybeRunSelfTest} from './dev/self-test';
 import './app.css';
 
 // HashParserHOC 相当: マウント時にデフォルトプロジェクト(ネコ入り)を読み込む
@@ -23,6 +24,7 @@ const App = () => {
     const handleVmInit = useCallback(newVm => {
         window.vm = newVm; // デバッグ用
         setVm(newVm);
+        maybeRunSelfTest(newVm);
     }, []);
 
     return (

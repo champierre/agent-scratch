@@ -1,14 +1,13 @@
 {
   "name": "agent-scratch",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "version": "0.1.0",
+  "description": "AI agent that builds Scratch projects from natural language instructions (Scratch mod with built-in Claude agent)",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "webpack serve --mode development",
+    "build": "webpack --mode production",
+    "test": "esbuild test/block-builder.test.js --bundle --platform=node --format=cjs --outfile=.tmp-test.cjs --log-level=error && node .tmp-test.cjs && rm .tmp-test.cjs"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
     "@scratch/scratch-gui": "^14.1.0",
@@ -24,10 +23,12 @@
     "babel-loader": "^10.1.1",
     "copy-webpack-plugin": "^14.0.0",
     "css-loader": "^7.1.4",
+    "esbuild": "^0.28.0",
     "html-webpack-plugin": "^5.6.7",
     "style-loader": "^4.0.0",
     "webpack": "^5.107.2",
     "webpack-cli": "^7.0.3",
     "webpack-dev-server": "^5.2.4"
-  }
+  },
+  "private": true
 }

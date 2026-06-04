@@ -1,11 +1,18 @@
 import React, {useState} from 'react';
 import './api-key-modal.css';
 
-const ApiKeyModal = ({initialApiKey, onSave, onClose}) => {
+const MODELS = [
+    {id: 'claude-opus-4-8', label: 'Claude Opus 4.8(高性能・推奨)'},
+    {id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6(高速・低コスト)'},
+    {id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5(最速・最安)'}
+];
+
+const ApiKeyModal = ({initialApiKey, initialModel, onSave, onClose}) => {
     const [value, setValue] = useState(initialApiKey || '');
+    const [model, setModelValue] = useState(initialModel || MODELS[0].id);
 
     const save = () => {
-        onSave(value.trim());
+        onSave(value.trim(), model);
     };
 
     return (
@@ -31,6 +38,18 @@ const ApiKeyModal = ({initialApiKey, onSave, onClose}) => {
                     <p className="as-modal-hint">
                         API キーは <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer">Anthropic Console</a> で取得できます。
                     </p>
+                    <label className="as-modal-label">
+                        使用モデル
+                        <select
+                            className="as-modal-select"
+                            value={model}
+                            onChange={e => setModelValue(e.target.value)}
+                        >
+                            {MODELS.map(m => (
+                                <option key={m.id} value={m.id}>{m.label}</option>
+                            ))}
+                        </select>
+                    </label>
                 </div>
                 <div className="as-modal-footer">
                     <button className="as-modal-button as-modal-cancel" onClick={onClose}>キャンセル</button>

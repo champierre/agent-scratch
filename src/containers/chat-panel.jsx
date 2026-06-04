@@ -1,7 +1,7 @@
 import React, {useCallback, useRef, useState} from 'react';
 import ChatPanelComponent from '../components/chat-panel/chat-panel.jsx';
 import ApiKeyModal from '../components/api-key-modal/api-key-modal.jsx';
-import {runAgent, AuthError} from '../agent/agent-loop';
+import {runAgent, AuthError, getModel, setModel} from '../agent/agent-loop';
 
 const STORAGE_KEY = 'agent-scratch-api-key';
 
@@ -72,9 +72,10 @@ const ChatPanel = ({vm}) => {
         if (abortRef.current) abortRef.current.abort();
     }, []);
 
-    const handleSaveApiKey = useCallback(key => {
+    const handleSaveApiKey = useCallback((key, model) => {
         localStorage.setItem(STORAGE_KEY, key);
         setApiKey(key);
+        if (model) setModel(model);
         setShowModal(false);
     }, []);
 
@@ -91,6 +92,7 @@ const ChatPanel = ({vm}) => {
             {showModal && (
                 <ApiKeyModal
                     initialApiKey={apiKey}
+                    initialModel={getModel()}
                     onSave={handleSaveApiKey}
                     onClose={() => setShowModal(false)}
                 />

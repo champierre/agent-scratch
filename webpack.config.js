@@ -1,4 +1,5 @@
 const path = require('path');
+const webpack = require('webpack');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 
@@ -36,9 +37,32 @@ module.exports = (env, argv) => ({
         ]
     },
     resolve: {
-        extensions: ['.js', '.jsx']
+        extensions: ['.js', '.jsx'],
+        // @anthropic-ai/sdk が条件付きで参照する Node ビルトインを無効化
+        // (ブラウザ実行時には使われないコードパス)
+        alias: {
+            readline: false,
+            worker_threads: false
+        },
+        fallback: {
+            fs: false,
+            'fs/promises': false,
+            path: false,
+            crypto: false,
+            child_process: false,
+            os: false,
+            events: false,
+            util: false,
+            stream: false,
+            tty: false,
+            net: false
+        }
     },
     plugins: [
+        // "node:fs" 形式の参照を "fs" に正規化して fallback に乗せる
+        new webpack.NormalModuleReplacementPlugin(/^node:/, resource => {
+            resource.request = resource.request.replace(/^node:/, '');
+        }),
         new HtmlWebpackPlugin({
             template: 'src/index.html',
             title: 'Agent Scratch'
