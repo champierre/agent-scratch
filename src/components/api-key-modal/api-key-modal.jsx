@@ -2,9 +2,9 @@ import React, {useState} from 'react';
 import './api-key-modal.css';
 
 const MODELS = [
-    {id: 'claude-opus-4-8', label: 'Claude Opus 4.8(高性能・推奨)'},
-    {id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6(高速・低コスト)'},
-    {id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5(最速・最安)'}
+    {id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5(最速・最安/デフォルト)'},
+    {id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6(バランス型)'},
+    {id: 'claude-opus-4-8', label: 'Claude Opus 4.8(最高性能・高コスト)'}
 ];
 
 const ApiKeyModal = ({initialApiKey, initialModel, onSave, onClose}) => {

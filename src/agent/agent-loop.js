@@ -7,9 +7,26 @@ import {createToolHandlers, ToolError} from './tool-handlers';
 export class AuthError extends Error {}
 
 const MODEL_STORAGE_KEY = 'agent-scratch-model';
-export const DEFAULT_MODEL = 'claude-opus-4-8';
+export const DEFAULT_MODEL = 'claude-haiku-4-5-20251001'; // 最安モデルをデフォルトに
 export const getModel = () => localStorage.getItem(MODEL_STORAGE_KEY) || DEFAULT_MODEL;
 export const setModel = model => localStorage.setItem(MODEL_STORAGE_KEY, model);
+
+// 100万トークンあたりのUSD単価(概算用)。キャッシュ書込は入力の1.25倍、読出は0.1倍
+const PRICING = {
+    'claude-opus-4-8': {input: 5, output: 25},
+    'claude-sonnet-4-6': {input: 3, output: 15},
+    'claude-haiku-4-5-20251001': {input: 1, output: 5}
+};
+
+export const estimateCost = (model, usage) => {
+    const price = PRICING[model] || PRICING[DEFAULT_MODEL];
+    return (
+        ((usage.input_tokens || 0) * price.input) +
+        ((usage.cache_creation_input_tokens || 0) * price.input * 1.25) +
+        ((usage.cache_read_input_tokens || 0) * price.input * 0.1) +
+        ((usage.output_tokens || 0) * price.output)
+    ) / 1e6;
+};
 
 const MAX_ITERATIONS = 30;
 const MAX_TOKENS = 16000;
@@ -43,7 +60,8 @@ export const runAgent = async ({
     signal,
     onAssistantText,
     onToolStart,
-    onToolEnd
+    onToolEnd,
+    onUsage
 }) => {
     const client = new Anthropic({
         apiKey,
@@ -96,6 +114,10 @@ export const runAgent = async ({
         }
 
         apiMessages.push({role: 'assistant', content: response.content});
+
+        if (onUsage && response.usage) {
+            onUsage(estimateCost(getModel(), response.usage));
+        }
 
         // テキスト部分をUIへ
         for (const block of response.content) {

@@ -4,12 +4,17 @@ import ApiKeyModal from '../components/api-key-modal/api-key-modal.jsx';
 import {runAgent, AuthError, getModel, setModel} from '../agent/agent-loop';
 
 const STORAGE_KEY = 'agent-scratch-api-key';
+const COST_STORAGE_KEY = 'agent-scratch-total-cost';
 
 const ChatPanel = ({vm}) => {
     const [messages, setMessages] = useState([]);
     const [running, setRunning] = useState(false);
     const [apiKey, setApiKey] = useState(() => localStorage.getItem(STORAGE_KEY) || '');
     const [showModal, setShowModal] = useState(false);
+    const [sessionCost, setSessionCost] = useState(0);
+    const [totalCost, setTotalCost] = useState(
+        () => parseFloat(localStorage.getItem(COST_STORAGE_KEY)) || 0
+    );
 
     // Anthropic API 形式の会話履歴(マルチターン対応)
     const apiMessagesRef = useRef([]);
@@ -33,6 +38,15 @@ const ChatPanel = ({vm}) => {
         });
     }, []);
 
+    const handleUsage = useCallback(cost => {
+        setSessionCost(prev => prev + cost);
+        setTotalCost(prev => {
+            const next = prev + cost;
+            localStorage.setItem(COST_STORAGE_KEY, String(next));
+            return next;
+        });
+    }, []);
+
     const handleSend = useCallback(async text => {
         if (!vm) {
             appendMessage({role: 'error', text: 'Scratch エディタの読み込みが完了していません。'});
@@ -51,7 +65,8 @@ const ChatPanel = ({vm}) => {
                 signal: controller.signal,
                 onAssistantText: t => appendMessage({role: 'assistant', text: t}),
                 onToolStart: summary => appendMessage({role: 'tool', text: summary, status: 'running'}),
-                onToolEnd: ok => finishLastTool(ok)
+                onToolEnd: ok => finishLastTool(ok),
+                onUsage: handleUsage
             });
         } catch (e) {
             if (e instanceof AuthError) {
@@ -66,7 +81,7 @@ const ChatPanel = ({vm}) => {
             setRunning(false);
             abortRef.current = null;
         }
-    }, [vm, apiKey, appendMessage, finishLastTool]);
+    }, [vm, apiKey, appendMessage, finishLastTool, handleUsage]);
 
     const handleStop = useCallback(() => {
         if (abortRef.current) abortRef.current.abort();
@@ -85,6 +100,8 @@ const ChatPanel = ({vm}) => {
                 messages={messages}
                 running={running}
                 hasApiKey={!!apiKey}
+                sessionCost={sessionCost}
+                totalCost={totalCost}
                 onSend={handleSend}
                 onStop={handleStop}
                 onOpenSettings={() => setShowModal(true)}

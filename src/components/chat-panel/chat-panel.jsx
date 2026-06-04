@@ -45,10 +45,14 @@ const MessageRow = ({message}) => {
     );
 };
 
+const formatCost = cost => (cost >= 0.01 ? `$${cost.toFixed(2)}` : `$${cost.toFixed(4)}`);
+
 const ChatPanel = ({
     messages,
     running,
     hasApiKey,
+    sessionCost,
+    totalCost,
     onSend,
     onStop,
     onOpenSettings
@@ -97,6 +101,11 @@ const ChatPanel = ({
                 {messages.map((m, i) => <MessageRow key={i} message={m} />)}
             </div>
             <div className="as-chat-input-area">
+                {totalCost > 0 && (
+                    <div className="as-chat-cost" title="トークン使用量から計算した概算です">
+                        コスト(概算): このセッション {formatCost(sessionCost)} / 累計 {formatCost(totalCost)}
+                    </div>
+                )}
                 {!hasApiKey && (
                     <div className="as-chat-no-key" onClick={onOpenSettings}>
                         ⚙️ をクリックして Anthropic API キーを設定してください
