@@ -160,7 +160,7 @@ export const createToolHandlers = vm => ({
 
         // スクリプト内に pen_ ブロックが含まれていたらペン拡張を自動ロード
         const scriptJson = JSON.stringify(scripts);
-        if (scriptJson.includes('"pen_') && !vm.runtime._extensions.isExtensionLoaded('pen')) {
+        if (scriptJson.includes('"pen_') && !vm.extensionManager.isExtensionLoaded('pen')) {
             await vm.extensionManager.loadExtensionURL('pen');
         }
 
