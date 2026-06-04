@@ -142,6 +142,17 @@ export const TOOLS = [
     }
 ];
 
+// ツール入力の生成中(ストリーミング中)にUIへ出す進捗ラベル
+export const draftingLabel = name => {
+    switch (name) {
+    case 'set_scripts': return 'ブロックを書いています';
+    case 'add_sprite': return 'スプライトを選んでいます';
+    case 'search_library': return 'ライブラリを探しています';
+    case 'set_sprite_properties': return 'スプライトを配置しています';
+    default: return '次の操作を準備しています';
+    }
+};
+
 // チャットUIに表示するツール実行サマリ
 export const summarizeToolCall = (name, input) => {
     switch (name) {
