@@ -1,8 +1,8 @@
 .as-chat-panel {
     display: flex;
     flex-direction: column;
-    width: 340px;
-    flex: 0 0 340px;
+    width: 280px;
+    flex: 0 0 280px;
     height: 100%;
     background: #f9f9fb;
     border-left: 1px solid #dbdbdb;
