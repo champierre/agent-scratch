@@ -42,7 +42,8 @@ export default {
         }
 
         const url = new URL(request.url);
-        if (request.method !== 'POST' || url.pathname !== '/v1/chat/completions') {
+        if (request.method !== 'POST' ||
+            (url.pathname !== '/v1/chat/completions' && url.pathname !== '/chat/completions')) {
             return Response.json({error: 'not found'}, {status: 404, headers: cors.headers});
         }
 
