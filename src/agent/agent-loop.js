@@ -34,6 +34,7 @@ export const estimateCost = (model, usage) => {
 
 const MAX_ITERATIONS = 30;
 const MAX_TOKENS = 16000;
+const REQUEST_TIMEOUT_MS = 180000; // 1回のAPI呼び出しの上限(ストリーミングなので通常は当たらない保険)
 
 // 会話の末尾に cache_control を付け直す(移動式ブレークポイント)
 const moveCacheMarker = messages => {
@@ -62,6 +63,8 @@ export const runAgent = async ({
     userText,
     apiMessages,
     signal,
+    onAssistantStart,
+    onAssistantDelta,
     onAssistantText,
     onToolStart,
     onToolEnd,
@@ -75,7 +78,9 @@ export const runAgent = async ({
         apiKey: useTrial ? 'trial-mode' : apiKey,
         ...(useTrial ? {baseURL: TRIAL_PROXY_URL} : {}),
         dangerouslyAllowBrowser: true,
-        defaultHeaders: {'anthropic-dangerous-direct-browser-access': 'true'}
+        defaultHeaders: {'anthropic-dangerous-direct-browser-access': 'true'},
+        timeout: REQUEST_TIMEOUT_MS,
+        maxRetries: 1
     });
     const handlers = createToolHandlers(vm);
 
@@ -94,7 +99,9 @@ export const runAgent = async ({
 
         let response;
         try {
-            response = await client.messages.create({
+            // ストリーミングで呼び出し、textの増分をUIへ逐次反映する
+            if (onAssistantStart) onAssistantStart();
+            const stream = client.messages.stream({
                 model,
                 max_tokens: MAX_TOKENS,
                 system,
@@ -102,12 +109,17 @@ export const runAgent = async ({
                 messages: apiMessages,
                 ...(useThinking ? {thinking: {type: 'adaptive'}} : {})
             }, {signal});
+            if (onAssistantDelta) {
+                stream.on('text', delta => onAssistantDelta(delta));
+            }
+            // 完全なMessage(thinking/tool_useブロック込み)を取得
+            response = await stream.finalMessage();
         } catch (e) {
             if (e instanceof Anthropic.AuthenticationError) {
                 throw new AuthError(e.message);
             }
             if (e instanceof Anthropic.RateLimitError) {
-                throw new Error('レート制限に達しました。しばらく待ってからもう一度試してください。');
+                throw new Error('混み合っています。少し待ってからもう一度試してください。');
             }
             // adaptive thinking 未対応モデルへのフォールバック
             if (useThinking && e instanceof Anthropic.BadRequestError &&
@@ -115,6 +127,16 @@ export const runAgent = async ({
                 useThinking = false;
                 iteration--;
                 continue;
+            }
+            if (e instanceof Anthropic.BadRequestError &&
+                String(e.message).includes('model not allowed')) {
+                throw new Error('お試しモードでは使えないモデルです。⚙️ から自分のAPIキーを設定してください。');
+            }
+            if (e instanceof Anthropic.APIConnectionTimeoutError) {
+                throw new Error('時間がかかりすぎたため中断しました。タスクを小さく分けて指示してみてください(例:「まずボールとパドルだけ作って」)。');
+            }
+            if (e instanceof Anthropic.APIUserAbortError) {
+                return; // ユーザーによる停止
             }
             if (e instanceof Anthropic.APIConnectionError) {
                 throw new Error('Anthropic API に接続できませんでした。ネットワークを確認してください。');
@@ -126,13 +148,6 @@ export const runAgent = async ({
 
         if (onUsage && response.usage) {
             onUsage(estimateCost(model, response.usage));
-        }
-
-        // テキスト部分をUIへ
-        for (const block of response.content) {
-            if (block.type === 'text' && block.text.trim()) {
-                onAssistantText(block.text);
-            }
         }
 
         if (response.stop_reason !== 'tool_use') {

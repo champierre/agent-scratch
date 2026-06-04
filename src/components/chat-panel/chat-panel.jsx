@@ -47,6 +47,14 @@ const MessageRow = ({message}) => {
 
 const formatCost = cost => (cost >= 0.01 ? `$${cost.toFixed(2)}` : `$${cost.toFixed(4)}`);
 
+// 応答待ちインジケータ
+const ThinkingRow = () => (
+    <div className="as-chat-message as-chat-tool">
+        <span className="as-chat-tool-spinner" />
+        <span className="as-chat-tool-text">考え中...</span>
+    </div>
+);
+
 const ChatPanel = ({
     messages,
     running,
@@ -67,7 +75,14 @@ const ChatPanel = ({
         if (el) {
             el.scrollTop = el.scrollHeight;
         }
-    }, [messages]);
+    }, [messages, running]);
+
+    // ストリーミング表示中・ツール実行中は「考え中...」を重ねて出さない
+    const lastMessage = messages[messages.length - 1];
+    const showThinking = running && !(
+        (lastMessage && lastMessage.role === 'assistant' && lastMessage.streaming) ||
+        (lastMessage && lastMessage.role === 'tool' && lastMessage.status === 'running')
+    );
 
     const submit = () => {
         const text = input.trim();
@@ -101,6 +116,7 @@ const ChatPanel = ({
                     </div>
                 )}
                 {messages.map((m, i) => <MessageRow key={i} message={m} />)}
+                {showThinking && <ThinkingRow />}
             </div>
             <div className="as-chat-input-area">
                 {hasApiKey && (

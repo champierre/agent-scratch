@@ -1,6 +1,42 @@
 // ?selftest=1 でVMツールハンドラをClaudeなしで通しで検証する開発用スクリプト
+// ?agenttest=1 でお試しモード(プロキシ)経由のエージェントループをE2E検証する
 /* eslint-disable no-console */
 import {createToolHandlers} from '../agent/tool-handlers';
+import {runAgent, isTrialAvailable} from '../agent/agent-loop';
+
+export const maybeRunAgentTest = vm => {
+    if (!new URLSearchParams(window.location.search).has('agenttest')) return;
+    const run = async () => {
+        console.log('[agenttest] start (trial available:', isTrialAvailable(), ')');
+        let deltaCount = 0;
+        let firstDeltaAt = null;
+        const startedAt = Date.now();
+        try {
+            await runAgent({
+                apiKey: '',
+                vm,
+                userText: 'ネコが旗をクリックしたら右に動き続けるようにして',
+                apiMessages: [],
+                onAssistantStart: () => console.log('[agenttest] turn start at', Date.now() - startedAt, 'ms'),
+                onAssistantDelta: delta => {
+                    deltaCount++;
+                    if (!firstDeltaAt) {
+                        firstDeltaAt = Date.now() - startedAt;
+                        console.log('[agenttest] first delta at', firstDeltaAt, 'ms:', JSON.stringify(delta));
+                    }
+                },
+                onAssistantText: t => console.log('[agenttest] text:', t),
+                onToolStart: s => console.log('[agenttest] tool start:', s),
+                onToolEnd: ok => console.log('[agenttest] tool end:', ok),
+                onUsage: cost => console.log('[agenttest] usage cost: $' + cost.toFixed(5))
+            });
+            console.log('[agenttest] PASSED. deltas:', deltaCount, 'elapsed:', Date.now() - startedAt, 'ms');
+        } catch (e) {
+            console.error('[agenttest] FAILED:', e.message);
+        }
+    };
+    setTimeout(run, 4000);
+};
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 

@@ -58,7 +58,6 @@ export default {
             return Response.json({error: 'model not allowed'}, {status: 400, headers: cors.headers});
         }
         body.max_tokens = Math.min(body.max_tokens || MAX_TOKENS_LIMIT, MAX_TOKENS_LIMIT);
-        body.stream = false; // ストリーミングは未対応
 
         const upstream = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
@@ -70,9 +69,16 @@ export default {
             body: JSON.stringify(body)
         });
 
+        // SSE(text/event-stream)をそのままパススルーする。
+        // body を text 化せず ReadableStream のまま返すことで、チャンクが
+        // 届き次第クライアントへ流れ、Cloudflareのバッファリングタイムアウトを回避する。
         return new Response(upstream.body, {
             status: upstream.status,
-            headers: {...cors.headers, 'content-type': 'application/json'}
+            headers: {
+                ...cors.headers,
+                'content-type': upstream.headers.get('content-type') || 'application/json',
+                'cache-control': 'no-cache, no-transform'
+            }
         });
     }
 };

@@ -29,6 +29,32 @@ const ChatPanel = ({vm}) => {
         setMessages(prev => [...prev, m]);
     }, []);
 
+    // ストリーミング: 次のdeltaで新しいassistant行を開始する合図
+    const pendingNewAssistant = useRef(false);
+    const startAssistant = useCallback(() => {
+        pendingNewAssistant.current = true;
+    }, []);
+
+    // textの増分を末尾のstreaming行に追記(なければ新規作成)
+    const appendAssistantDelta = useCallback(delta => {
+        setMessages(prev => {
+            const next = [...prev];
+            const last = next[next.length - 1];
+            if (pendingNewAssistant.current || !last || last.role !== 'assistant' || !last.streaming) {
+                pendingNewAssistant.current = false;
+                next.push({role: 'assistant', text: delta, streaming: true});
+            } else {
+                next[next.length - 1] = {...last, text: last.text + delta};
+            }
+            return next;
+        });
+    }, []);
+
+    // 実行終了時にstreamingフラグを落とす(「考え中...」表示判定用)
+    const finishStreaming = useCallback(() => {
+        setMessages(prev => prev.map(m => (m.streaming ? {...m, streaming: false} : m)));
+    }, []);
+
     // 直近の実行中ツール表示を done/error に更新する
     const finishLastTool = useCallback(ok => {
         setMessages(prev => {
@@ -68,6 +94,8 @@ const ChatPanel = ({vm}) => {
                 userText: text,
                 apiMessages: apiMessagesRef.current,
                 signal: controller.signal,
+                onAssistantStart: startAssistant,
+                onAssistantDelta: appendAssistantDelta,
                 onAssistantText: t => appendMessage({role: 'assistant', text: t}),
                 onToolStart: summary => appendMessage({role: 'tool', text: summary, status: 'running'}),
                 onToolEnd: ok => finishLastTool(ok),
@@ -84,9 +112,10 @@ const ChatPanel = ({vm}) => {
             }
         } finally {
             setRunning(false);
+            finishStreaming();
             abortRef.current = null;
         }
-    }, [vm, apiKey, appendMessage, finishLastTool, handleUsage]);
+    }, [vm, apiKey, appendMessage, finishLastTool, handleUsage, startAssistant, appendAssistantDelta, finishStreaming]);
 
     const handleStop = useCallback(() => {
         if (abortRef.current) abortRef.current.abort();
