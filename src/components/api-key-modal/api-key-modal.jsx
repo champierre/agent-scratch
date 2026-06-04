@@ -3,11 +3,11 @@ import {isDeepSeekModel} from '../../agent/agent-loop';
 import './api-key-modal.css';
 
 const MODELS = [
-    {id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5(最速・最安/デフォルト)', provider: 'anthropic'},
+    {id: 'deepseek-chat', label: 'DeepSeek V3(低コスト・高性能/デフォルト)', provider: 'deepseek'},
+    {id: 'deepseek-reasoner', label: 'DeepSeek R1(推論特化)', provider: 'deepseek'},
+    {id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5(最速・最安)', provider: 'anthropic'},
     {id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6(バランス型)', provider: 'anthropic'},
-    {id: 'claude-opus-4-8', label: 'Claude Opus 4.8(最高性能・高コスト)', provider: 'anthropic'},
-    {id: 'deepseek-chat', label: 'DeepSeek V3(低コスト・高性能)', provider: 'deepseek'},
-    {id: 'deepseek-reasoner', label: 'DeepSeek R1(推論特化)', provider: 'deepseek'}
+    {id: 'claude-opus-4-8', label: 'Claude Opus 4.8(最高性能・高コスト)', provider: 'anthropic'}
 ];
 
 const ApiKeyModal = ({initialApiKey, initialDeepSeekApiKey, initialModel, onSave, onClose}) => {

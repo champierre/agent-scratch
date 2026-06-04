@@ -1,14 +1,14 @@
-// agent-scratch 試用モード用の Anthropic API プロキシ (Cloudflare Worker)
+// agent-scratch 試用モード用の DeepSeek API プロキシ (Cloudflare Worker)
 //
-// APIキーは Worker の Secret (ANTHROPIC_API_KEY) に保持し、クライアントには渡さない。
+// APIキーは Worker の Secret (DEEPSEEK_API_KEY) に保持し、クライアントには渡さない。
 // デプロイ:
 //   cd worker
 //   npx wrangler deploy
-//   npx wrangler secret put ANTHROPIC_API_KEY   # 支出上限付きのキーを推奨
+//   npx wrangler secret put DEEPSEEK_API_KEY   # 支出上限付きのキーを推奨
 
-// お試しモードは最安のHaikuのみ許可
+// お試しモードは低コストの deepseek-chat のみ許可
 const ALLOWED_MODELS = [
-    'claude-haiku-4-5-20251001'
+    'deepseek-chat'
 ];
 
 const MAX_TOKENS_LIMIT = 16000;
@@ -21,7 +21,6 @@ const corsHeaders = (request, allowedOrigins) => {
         headers: {
             'Access-Control-Allow-Origin': allowed ? origin : allowedOrigins[0],
             'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            // SDKが付ける x-stainless-* 等を通すため、preflightの要求ヘッダをそのまま許可
             'Access-Control-Allow-Headers':
                 request.headers.get('Access-Control-Request-Headers') || '*',
             'Access-Control-Max-Age': '86400',
@@ -43,7 +42,7 @@ export default {
         }
 
         const url = new URL(request.url);
-        if (request.method !== 'POST' || url.pathname !== '/v1/messages') {
+        if (request.method !== 'POST' || url.pathname !== '/v1/chat/completions') {
             return Response.json({error: 'not found'}, {status: 404, headers: cors.headers});
         }
 
@@ -59,19 +58,15 @@ export default {
         }
         body.max_tokens = Math.min(body.max_tokens || MAX_TOKENS_LIMIT, MAX_TOKENS_LIMIT);
 
-        const upstream = await fetch('https://api.anthropic.com/v1/messages', {
+        const upstream = await fetch('https://api.deepseek.com/v1/chat/completions', {
             method: 'POST',
             headers: {
                 'content-type': 'application/json',
-                'x-api-key': env.ANTHROPIC_API_KEY,
-                'anthropic-version': request.headers.get('anthropic-version') || '2023-06-01'
+                'authorization': `Bearer ${env.DEEPSEEK_API_KEY}`
             },
             body: JSON.stringify(body)
         });
 
-        // SSE(text/event-stream)をそのままパススルーする。
-        // body を text 化せず ReadableStream のまま返すことで、チャンクが
-        // 届き次第クライアントへ流れ、Cloudflareのバッファリングタイムアウトを回避する。
         return new Response(upstream.body, {
             status: upstream.status,
             headers: {
