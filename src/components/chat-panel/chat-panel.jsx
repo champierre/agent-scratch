@@ -101,7 +101,7 @@ const ChatPanel = ({
                 {messages.map((m, i) => <MessageRow key={i} message={m} />)}
             </div>
             <div className="as-chat-input-area">
-                {totalCost > 0 && (
+                {hasApiKey && (
                     <div className="as-chat-cost" title="トークン使用量から計算した概算です">
                         コスト(概算): このセッション {formatCost(sessionCost)} / 累計 {formatCost(totalCost)}
                     </div>
