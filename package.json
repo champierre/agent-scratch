@@ -7,7 +7,7 @@
     "build": "webpack --mode production",
     "test": "esbuild test/block-builder.test.js --bundle --platform=node --format=cjs --outfile=.tmp-test.cjs --log-level=error && node .tmp-test.cjs && rm .tmp-test.cjs"
   },
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
     "@scratch/scratch-gui": "^14.1.0",

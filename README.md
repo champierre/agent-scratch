@@ -75,4 +75,8 @@ src/
 
 ## ライセンス
 
-MIT
+[AGPL-3.0-only](LICENSE)
+
+本プロジェクトが依存・バンドルする [@scratch/scratch-gui](https://www.npmjs.com/package/@scratch/scratch-gui) および scratch-vm 等の関連パッケージは AGPL-3.0-only でライセンスされているため、本プロジェクトも同ライセンスに従います。
+
+なお、Scratch の名称・ロゴ・Scratchキャット等は Scratch Foundation の商標であり、本プロジェクトは Scratch Foundation と無関係の非公式 mod です。
