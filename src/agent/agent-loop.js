@@ -1,7 +1,7 @@
 // Anthropic Messages API の手動 tool use ループ
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
-import {TOOLS, summarizeToolCall, draftingLabel} from './tools';
+import {TOOLS, BLOCK_TOOL_NAMES, summarizeToolCall, draftingLabel} from './tools';
 import {SYSTEM_PROMPT} from './system-prompt';
 import {createToolHandlers, ToolError} from './tool-handlers';
 
@@ -13,7 +13,8 @@ export const isTrialAvailable = () => Boolean(TRIAL_PROXY_URL);
 
 const MODEL_STORAGE_KEY = 'agent-scratch-model';
 const DEEPSEEK_API_KEY_STORAGE_KEY = 'agent-scratch-deepseek-api-key';
-export const DEFAULT_MODEL = 'claude-haiku-4-5-20251001'; // 最安モデルをデフォルトに
+export const DEFAULT_MODEL = 'deepseek-chat'; // デフォルトモデル
+export const TRIAL_MODEL = 'deepseek-chat';   // お試しモードで使うモデル
 export const getModel = () => localStorage.getItem(MODEL_STORAGE_KEY) || DEFAULT_MODEL;
 export const setModel = model => localStorage.setItem(MODEL_STORAGE_KEY, model);
 export const getDeepSeekApiKey = () => localStorage.getItem(DEEPSEEK_API_KEY_STORAGE_KEY) || '';
@@ -111,10 +112,13 @@ const anthropicToOpenAIMessages = messages => {
  */
 const runDeepSeekAgent = async ({
     deepseekApiKey,
+    baseURL,
+    model: modelOverride,
     vm,
     userText,
     apiMessages,
     signal,
+    blocksEnabled,
     onAssistantStart,
     onAssistantDelta,
     onAssistantText,
@@ -123,16 +127,17 @@ const runDeepSeekAgent = async ({
     onToolDrafting,
     onUsage
 }) => {
-    const model = getModel();
+    const model = modelOverride || getModel();
     const client = new OpenAI({
         apiKey: deepseekApiKey,
-        baseURL: 'https://api.deepseek.com',
+        baseURL: baseURL || 'https://api.deepseek.com',
         dangerouslyAllowBrowser: true,
         timeout: REQUEST_TIMEOUT_MS,
         maxRetries: 1
     });
     const handlers = createToolHandlers(vm);
-    const oaiTools = toOpenAITools(TOOLS);
+    const activeTools = blocksEnabled ? TOOLS : TOOLS.filter(t => !BLOCK_TOOL_NAMES.has(t.name));
+    const oaiTools = toOpenAITools(activeTools);
     const systemMessages = [{role: 'system', content: SYSTEM_PROMPT}];
 
     apiMessages.push({role: 'user', content: [{type: 'text', text: userText}]});
@@ -262,6 +267,7 @@ export const runAgent = async ({
     userText,
     apiMessages,
     signal,
+    blocksEnabled = true,
     onAssistantStart,
     onAssistantDelta,
     onAssistantText,
@@ -270,25 +276,36 @@ export const runAgent = async ({
     onToolDrafting,
     onUsage
 }) => {
-    // DeepSeekモデルが選択されている場合は専用ループへ
     const model = getModel();
-    if (isDeepSeekModel(model)) {
-        const deepseekApiKey = getDeepSeekApiKey();
-        if (!deepseekApiKey) throw new AuthError('DeepSeek APIキーが設定されていません。⚙️ から設定してください。');
+
+    // お試しモード: キー未入力 + プロキシURL設定済み → DeepSeek プロキシ経由
+    const useTrial = !apiKey && !getDeepSeekApiKey() && isTrialAvailable();
+    if (useTrial) {
         return runDeepSeekAgent({
-            deepseekApiKey, vm, userText, apiMessages, signal,
+            deepseekApiKey: 'trial-mode',
+            baseURL: TRIAL_PROXY_URL,
+            model: TRIAL_MODEL,
+            vm, userText, apiMessages, signal, blocksEnabled,
             onAssistantStart, onAssistantDelta, onAssistantText,
             onToolStart, onToolEnd, onToolDrafting, onUsage
         });
     }
 
-    // キー未入力なら試用プロキシ経由(キーはWorker側のSecretが使われる)
-    const useTrial = !apiKey && isTrialAvailable();
-    // お試しモードは最安のHaikuに固定(Worker側でも同じ制限をかけている)
-    const effectiveModel = useTrial ? DEFAULT_MODEL : model;
+    // DeepSeekモデルが選択されている場合は専用ループへ
+    if (isDeepSeekModel(model)) {
+        const deepseekApiKey = getDeepSeekApiKey();
+        if (!deepseekApiKey) throw new AuthError('DeepSeek APIキーが設定されていません。⚙️ から設定してください。');
+        return runDeepSeekAgent({
+            deepseekApiKey, vm, userText, apiMessages, signal, blocksEnabled,
+            onAssistantStart, onAssistantDelta, onAssistantText,
+            onToolStart, onToolEnd, onToolDrafting, onUsage
+        });
+    }
+
+    // Anthropic モデル
+    const effectiveModel = model;
     const client = new Anthropic({
-        apiKey: useTrial ? 'trial-mode' : apiKey,
-        ...(useTrial ? {baseURL: TRIAL_PROXY_URL} : {}),
+        apiKey,
         dangerouslyAllowBrowser: true,
         defaultHeaders: {'anthropic-dangerous-direct-browser-access': 'true'},
         timeout: REQUEST_TIMEOUT_MS,
@@ -298,8 +315,9 @@ export const runAgent = async ({
 
     // システムプロンプトとツール定義は固定 → prompt caching
     const system = [{type: 'text', text: SYSTEM_PROMPT, cache_control: {type: 'ephemeral'}}];
-    const tools = TOOLS.map((tool, i) =>
-        (i === TOOLS.length - 1 ? {...tool, cache_control: {type: 'ephemeral'}} : tool)
+    const activeTools = blocksEnabled ? TOOLS : TOOLS.filter(t => !BLOCK_TOOL_NAMES.has(t.name));
+    const tools = activeTools.map((tool, i) =>
+        (i === activeTools.length - 1 ? {...tool, cache_control: {type: 'ephemeral'}} : tool)
     );
 
     apiMessages.push({role: 'user', content: [{type: 'text', text: userText}]});

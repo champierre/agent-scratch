@@ -13,6 +13,7 @@ const ChatPanel = ({vm}) => {
     const [running, setRunning] = useState(false);
     const [apiKey, setApiKey] = useState(() => localStorage.getItem(STORAGE_KEY) || '');
     const [deepseekApiKey, setDeepseekApiKeyState] = useState(() => getDeepSeekApiKey());
+    const [blocksEnabled, setBlocksEnabled] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [showDisclosure, setShowDisclosure] = useState(
         () => !localStorage.getItem(DISCLOSURE_STORAGE_KEY)
@@ -97,6 +98,7 @@ const ChatPanel = ({vm}) => {
                 userText: text,
                 apiMessages: apiMessagesRef.current,
                 signal: controller.signal,
+                blocksEnabled,
                 onAssistantStart: startAssistant,
                 onAssistantDelta: appendAssistantDelta,
                 onAssistantText: t => appendMessage({role: 'assistant', text: t}),
@@ -149,12 +151,14 @@ const ChatPanel = ({vm}) => {
                 running={running}
                 drafting={drafting}
                 hasApiKey={isDeepSeekModel(getModel()) ? !!deepseekApiKey : !!apiKey}
-                trialMode={!isDeepSeekModel(getModel()) && !apiKey && isTrialAvailable()}
+                trialMode={!apiKey && !deepseekApiKey && isTrialAvailable()}
                 sessionCost={sessionCost}
                 totalCost={totalCost}
+                blocksEnabled={blocksEnabled}
                 onSend={handleSend}
                 onStop={handleStop}
                 onOpenSettings={() => setShowModal(true)}
+                onToggleBlocks={() => setBlocksEnabled(v => !v)}
             />
             {showDisclosure && (
                 <DisclosureModal
