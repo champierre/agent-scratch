@@ -133,6 +133,17 @@ export const BLOCK_SPECS = {
     data_showvariable: {fields: {VARIABLE: {variable: ''}}},
     data_hidevariable: {fields: {VARIABLE: {variable: ''}}},
 
+    // ---- ペン拡張 ----
+    pen_clear: {},
+    pen_stamp: {},
+    pen_penDown: {},
+    pen_penUp: {},
+    pen_setPenColorToColor: {args: {COLOR: 'color'}},
+    pen_changePenColorParamBy: {args: {COLOR_PARAM: {menu: 'pen_menu_colorParam', field: 'colorParam', default: 'color'}, VALUE: 'number'}},
+    pen_setPenColorParamTo: {args: {COLOR_PARAM: {menu: 'pen_menu_colorParam', field: 'colorParam', default: 'color'}, VALUE: 'number'}},
+    pen_changePenSizeBy: {args: {SIZE: 'number'}},
+    pen_setPenSizeTo: {args: {SIZE: 'number'}},
+
     // ---- リスト ----
     data_listcontents: {shape: 'reporter', fields: {LIST: {variable: 'list'}}},
     data_addtolist: {fields: {LIST: {variable: 'list'}}, args: {ITEM: 'string'}},
