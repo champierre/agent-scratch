@@ -34,6 +34,9 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          # 試用モード用プロキシURL(リポジトリの Variables に設定。未設定なら試用モード無効)
+          TRIAL_PROXY_URL: ${{ vars.TRIAL_PROXY_URL }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

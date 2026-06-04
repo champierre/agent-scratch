@@ -6,6 +6,10 @@ import {createToolHandlers, ToolError} from './tool-handlers';
 
 export class AuthError extends Error {}
 
+// 試用モード: キー未入力時に使うプロキシURL(ビルド時に注入。空なら無効)
+const TRIAL_PROXY_URL = process.env.TRIAL_PROXY_URL;
+export const isTrialAvailable = () => Boolean(TRIAL_PROXY_URL);
+
 const MODEL_STORAGE_KEY = 'agent-scratch-model';
 export const DEFAULT_MODEL = 'claude-haiku-4-5-20251001'; // 最安モデルをデフォルトに
 export const getModel = () => localStorage.getItem(MODEL_STORAGE_KEY) || DEFAULT_MODEL;
@@ -63,8 +67,11 @@ export const runAgent = async ({
     onToolEnd,
     onUsage
 }) => {
+    // キー未入力なら試用プロキシ経由(キーはWorker側のSecretが使われる)
+    const useTrial = !apiKey && isTrialAvailable();
     const client = new Anthropic({
-        apiKey,
+        apiKey: useTrial ? 'trial-mode' : apiKey,
+        ...(useTrial ? {baseURL: TRIAL_PROXY_URL} : {}),
         dangerouslyAllowBrowser: true,
         defaultHeaders: {'anthropic-dangerous-direct-browser-access': 'true'}
     });

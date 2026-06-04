@@ -63,6 +63,10 @@ module.exports = (env, argv) => ({
         new webpack.NormalModuleReplacementPlugin(/^node:/, resource => {
             resource.request = resource.request.replace(/^node:/, '');
         }),
+        // 試用モード用プロキシURL(未設定なら試用モード無効)
+        new webpack.DefinePlugin({
+            'process.env.TRIAL_PROXY_URL': JSON.stringify(process.env.TRIAL_PROXY_URL || '')
+        }),
         new HtmlWebpackPlugin({
             template: 'src/index.html',
             title: 'Agent Scratch'

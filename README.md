@@ -32,6 +32,22 @@ npm start
 - ボールを追加して、ネコがボールに触れたらスコアが増えるゲームにして
 - 宇宙を背景にしてシューティングゲームを作って
 
+## お試しモード(共有キー)の設定
+
+APIキー未入力の訪問者でも試せるようにする仕組みです。GitHub Pages は静的サイトなので、キーをバンドルに埋め込むと誰でも抜き出せてしまいます。そのため、キーを Cloudflare Worker 側に秘匿するプロキシ方式を採用しています。
+
+```bash
+cd worker
+npx wrangler deploy                          # 初回は Cloudflare ログインを求められます
+npx wrangler secret put ANTHROPIC_API_KEY    # 支出上限付きの専用キーを推奨
+```
+
+デプロイで表示された URL(例: `https://agent-scratch-proxy.<account>.workers.dev`)を、GitHub リポジトリの **Settings → Secrets and variables → Actions → Variables** に `TRIAL_PROXY_URL` として登録し、Actions を再実行すると有効になります。
+
+- キーが露出しないよう、Anthropic のキーは **Cloudflare の Secret** に保存します(GitHub 側に登録するのは公開しても問題ないプロキシURLのみ)
+- Worker は許可オリジン(`worker/wrangler.toml` の `ALLOWED_ORIGINS`)からの `/v1/messages` だけを中継し、モデルと max_tokens を制限します
+- 悪用対策の最後の砦として、[Anthropic Console](https://console.anthropic.com/settings/limits) で**支出上限付きのキー**を使ってください
+
 ## 開発
 
 ```bash

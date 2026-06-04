@@ -1,7 +1,7 @@
 import React, {useCallback, useRef, useState} from 'react';
 import ChatPanelComponent from '../components/chat-panel/chat-panel.jsx';
 import ApiKeyModal from '../components/api-key-modal/api-key-modal.jsx';
-import {runAgent, AuthError, getModel, setModel} from '../agent/agent-loop';
+import {runAgent, AuthError, getModel, setModel, isTrialAvailable} from '../agent/agent-loop';
 
 const STORAGE_KEY = 'agent-scratch-api-key';
 const COST_STORAGE_KEY = 'agent-scratch-total-cost';
@@ -100,6 +100,7 @@ const ChatPanel = ({vm}) => {
                 messages={messages}
                 running={running}
                 hasApiKey={!!apiKey}
+                trialMode={!apiKey && isTrialAvailable()}
                 sessionCost={sessionCost}
                 totalCost={totalCost}
                 onSend={handleSend}

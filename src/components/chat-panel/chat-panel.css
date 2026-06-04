@@ -124,6 +124,16 @@
     text-align: right;
 }
 
+.as-chat-trial {
+    background: #e8f6ee;
+    border: 1px solid #8fd6ab;
+    border-radius: 6px;
+    padding: 6px 10px;
+    color: #1c7c43;
+    font-size: 12px;
+    cursor: pointer;
+}
+
 .as-chat-no-key {
     background: #fff4d9;
     border: 1px solid #f0c45c;

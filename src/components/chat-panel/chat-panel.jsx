@@ -51,12 +51,14 @@ const ChatPanel = ({
     messages,
     running,
     hasApiKey,
+    trialMode,
     sessionCost,
     totalCost,
     onSend,
     onStop,
     onOpenSettings
 }) => {
+    const canSend = hasApiKey || trialMode;
     const [input, setInput] = useState('');
     const historyRef = useRef(null);
 
@@ -106,7 +108,12 @@ const ChatPanel = ({
                         コスト(概算): このセッション {formatCost(sessionCost)} / 累計 {formatCost(totalCost)}
                     </div>
                 )}
-                {!hasApiKey && (
+                {trialMode && (
+                    <div className="as-chat-trial" onClick={onOpenSettings}>
+                        🎁 お試しモードで利用中(共有キー・制限あり)。⚙️ から自分の API キーを設定できます
+                    </div>
+                )}
+                {!canSend && (
                     <div className="as-chat-no-key" onClick={onOpenSettings}>
                         ⚙️ をクリックして Anthropic API キーを設定してください
                     </div>
@@ -116,7 +123,7 @@ const ChatPanel = ({
                     value={input}
                     placeholder="指示を入力..."
                     rows={3}
-                    disabled={!hasApiKey}
+                    disabled={!canSend}
                     onChange={e => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
                 />
@@ -127,7 +134,7 @@ const ChatPanel = ({
                 ) : (
                     <button
                         className="as-chat-button as-chat-send"
-                        disabled={!hasApiKey || !input.trim()}
+                        disabled={!canSend || !input.trim()}
                         onClick={submit}
                     >
                         送信

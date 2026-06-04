@@ -1,0 +1,10 @@
+name = "agent-scratch-proxy"
+main = "index.js"
+compatibility_date = "2026-06-01"
+
+[vars]
+# 試用モードを許可するオリジン(カンマ区切り)
+ALLOWED_ORIGINS = "https://champierre.github.io,http://localhost:8602"
+
+# Secret は wrangler で設定する(コミットしない):
+#   npx wrangler secret put ANTHROPIC_API_KEY
