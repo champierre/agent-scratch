@@ -163,10 +163,16 @@ export const createToolHandlers = vm => ({
         const scriptsSnapshot = [...t.blocks._scripts];
         try {
             const newBlocks = buildScripts(scripts, {resolveVariable});
+            // 旧ブロックを参照する実行中スレッドを止めてから差し替える
+            // (残っていると _updateGlows が消えたブロックIDを光らせようとして
+            //  "Tried to glow block that does not exist" が毎フレーム発生する)
+            vm.runtime.stopForTarget(t);
             t.blocks.deleteAllBlocks();
             for (const block of Object.values(newBlocks)) {
                 t.blocks.createBlock(block);
             }
+            // 前フレームのグロー参照に旧ブロックIDが残らないようクリア
+            vm.runtime._scriptGlowsPreviousFrame = [];
             vm.setEditingTarget(t.id);
             vm.emitWorkspaceUpdate();
             const scriptCount = t.blocks.getScripts().length;
