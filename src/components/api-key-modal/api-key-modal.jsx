@@ -1,0 +1,48 @@
+import React, {useState} from 'react';
+import './api-key-modal.css';
+
+const ApiKeyModal = ({initialApiKey, onSave, onClose}) => {
+    const [value, setValue] = useState(initialApiKey || '');
+
+    const save = () => {
+        onSave(value.trim());
+    };
+
+    return (
+        <div className="as-modal-overlay" onClick={onClose}>
+            <div className="as-modal" onClick={e => e.stopPropagation()}>
+                <div className="as-modal-header">Anthropic API キー設定</div>
+                <div className="as-modal-body">
+                    <p>
+                        Claude を利用するための API キーを入力してください。
+                        キーはこのブラウザの localStorage にのみ保存されます。
+                    </p>
+                    <input
+                        type="password"
+                        className="as-modal-input"
+                        placeholder="sk-ant-..."
+                        value={value}
+                        autoFocus
+                        onChange={e => setValue(e.target.value)}
+                        onKeyDown={e => {
+                            if (e.key === 'Enter') save();
+                        }}
+                    />
+                    <p className="as-modal-hint">
+                        API キーは <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer">Anthropic Console</a> で取得できます。
+                    </p>
+                </div>
+                <div className="as-modal-footer">
+                    <button className="as-modal-button as-modal-cancel" onClick={onClose}>キャンセル</button>
+                    <button
+                        className="as-modal-button as-modal-save"
+                        disabled={!value.trim()}
+                        onClick={save}
+                    >保存</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default ApiKeyModal;

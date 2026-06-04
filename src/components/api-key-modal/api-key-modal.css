@@ -1,0 +1,83 @@
+.as-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.as-modal {
+    background: white;
+    border-radius: 12px;
+    width: 420px;
+    max-width: 90vw;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 13px;
+    overflow: hidden;
+}
+
+.as-modal-header {
+    background: hsla(260, 60%, 60%, 1);
+    color: white;
+    font-weight: bold;
+    padding: 12px 16px;
+    font-size: 15px;
+}
+
+.as-modal-body {
+    padding: 16px;
+    line-height: 1.6;
+}
+
+.as-modal-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 13px;
+}
+
+.as-modal-input:focus {
+    outline: none;
+    border-color: hsla(260, 60%, 60%, 1);
+}
+
+.as-modal-hint {
+    color: #888;
+    font-size: 12px;
+}
+
+.as-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid #eee;
+}
+
+.as-modal-button {
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.as-modal-cancel {
+    background: #eee;
+    color: #333;
+}
+
+.as-modal-save {
+    background: hsla(260, 60%, 60%, 1);
+    color: white;
+}
+
+.as-modal-save:disabled {
+    background: #ccc;
+    cursor: default;
+}
