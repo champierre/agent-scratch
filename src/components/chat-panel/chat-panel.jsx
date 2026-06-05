@@ -16,22 +16,38 @@ const getSbLanguages = () => {
 };
 
 // opcode を scratchblocks SVG に変換するコンポーネント
-const OPCODE_RE = /\b([a-z]+_[a-zA-Z]+)\b/g;
+//
+// 検出パターンは「登録済み opcode(BLOCK_LABELS のキー)の完全一致リスト」から
+// 自動生成する。汎用の識別子パターン推測ではないため、登録済み opcode の
+// 取りこぼし(数字入り・複数アンダースコア等)が構造的に起きず、
+// opcode を追加すれば自動で検出対象になる。
+// 長いキー優先で並べ、前後が単語文字でないことを lookaround で保証する
+// (例: control_if_else の中の control_if に誤マッチしない)。
+const OPCODE_RE = new RegExp(
+    `(?<![A-Za-z0-9_])(${
+        Object.keys(BLOCK_LABELS)
+            .sort((a, b) => b.length - a.length)
+            .join('|')
+    })(?![A-Za-z0-9_])`,
+    'g'
+);
 const SB_LANGUAGES = getSbLanguages();
 
 const BlockImage = ({opcode, keyStr}) => {
     const ref = useRef(null);
     const lang = navigator.language || 'en';
     const label = getBlockLabel(opcode, lang);
-    if (!label) return <code key={keyStr}>{opcode}</code>;
 
     useEffect(() => {
-        if (!ref.current) return;
+        if (!ref.current || !label) return;
         ref.current.innerHTML = '';
         const doc = scratchblocks.parse(label, {inline: true, languages: SB_LANGUAGES});
         const svg = scratchblocks.render(doc, {style: 'scratch3', scale: 0.65});
         ref.current.appendChild(svg);
     }, [label]);
+
+    // フック呼び出しの後で early return する(Reactのフック順序を守る)
+    if (!label) return <code key={keyStr}>{opcode}</code>;
 
     return (
         <span
