@@ -2,6 +2,7 @@ const path = require('path');
 const webpack = require('webpack');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
+require('dotenv').config();
 
 const scratchGuiDist = path.dirname(
     require.resolve('@scratch/scratch-gui')
@@ -68,9 +69,11 @@ module.exports = (env, argv) => ({
         new webpack.NormalModuleReplacementPlugin(/^node:/, resource => {
             resource.request = resource.request.replace(/^node:/, '');
         }),
-        // 試用モード用プロキシURL(未設定なら試用モード無効)
+        // 環境変数をブラウザコードに注入(本番ビルドでは空文字になる)
         new webpack.DefinePlugin({
-            'process.env.TRIAL_PROXY_URL': JSON.stringify(process.env.TRIAL_PROXY_URL || '')
+            'process.env.TRIAL_PROXY_URL': JSON.stringify(process.env.TRIAL_PROXY_URL || ''),
+            'process.env.DEV_ANTHROPIC_API_KEY': JSON.stringify(process.env.DEV_ANTHROPIC_API_KEY || ''),
+            'process.env.DEV_DEEPSEEK_API_KEY': JSON.stringify(process.env.DEV_DEEPSEEK_API_KEY || '')
         }),
         new HtmlWebpackPlugin({
             template: 'src/index.html',
