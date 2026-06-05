@@ -1,6 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react';
 import scratchblocks from 'scratchblocks';
-import {BLOCK_LABELS} from '../../agent/block-labels';
+import {BLOCK_LABELS} from '../../agent/block-labels.js';
 import './chat-panel.css';
 
 // opcode を scratchblocks SVG に変換するコンポーネント
