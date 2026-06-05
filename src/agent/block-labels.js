@@ -1,8 +1,7 @@
 // opcode → scratchblocks 表示テキストのマッピング
-// scratchblocks の構文: https://scratchblocks.github.io/
 // 引数は [] で省略表現。実際の値は不要（ブロックの形が伝わればよい）
 
-export const BLOCK_LABELS = {
+const EN = {
     // ---- イベント ----
     event_whenflagclicked: 'when flag clicked',
     event_whenkeypressed: 'when [space v] key pressed',
@@ -149,4 +148,163 @@ export const BLOCK_LABELS = {
     pen_setPenColorParamTo: 'set pen [color v] to (50)',
     pen_changePenSizeBy: 'change pen size by (1)',
     pen_setPenSizeTo: 'set pen size to (1)'
+};
+
+const JA = {
+    // ---- イベント ----
+    event_whenflagclicked: '旗が押されたとき',
+    event_whenkeypressed: '[スペース v] キーが押されたとき',
+    event_whenthisspriteclicked: 'このスプライトが押されたとき',
+    event_whenstageclicked: 'ステージが押されたとき',
+    event_whenbackdropswitchesto: '背景が [backdrop1 v] になったとき',
+    event_whengreaterthan: '[音量 v] > (10) のとき',
+    event_whenbroadcastreceived: '[メッセージ1 v] を受け取ったとき',
+    event_broadcast: '[メッセージ1 v] を送る',
+    event_broadcastandwait: '[メッセージ1 v] を送って待つ',
+
+    // ---- 動き ----
+    motion_movesteps: '(10) 歩動かす',
+    motion_turnright: '右に (15) 度回す',
+    motion_turnleft: '左に (15) 度回す',
+    motion_goto: '[ランダムな位置 v] へ行く',
+    motion_gotoxy: 'x座標を (0) 、y座標を (0) にする',
+    motion_glideto: '(1) 秒で [ランダムな位置 v] へ行く',
+    motion_glidesecstoxy: '(1) 秒でx座標を (0) に、y座標を (0) に変える',
+    motion_pointindirection: '(90) 度に向ける',
+    motion_pointtowards: '[マウスのポインター v] へ向ける',
+    motion_changexby: 'x座標を (10) ずつ変える',
+    motion_setx: 'x座標を (0) にする',
+    motion_changeyby: 'y座標を (10) ずつ変える',
+    motion_sety: 'y座標を (0) にする',
+    motion_ifonedgebounce: 'もし端に着いたら、跳ね返る',
+    motion_setrotationstyle: '回転方法を [左右のみ v] にする',
+    motion_xposition: '(x座標)',
+    motion_yposition: '(y座標)',
+    motion_direction: '(向き)',
+
+    // ---- 見た目 ----
+    looks_sayforsecs: '[こんにちは！] と (2) 秒言う',
+    looks_say: '[こんにちは！] と言う',
+    looks_thinkforsecs: '[うーん…] と (2) 秒考える',
+    looks_think: '[うーん…] と考える',
+    looks_switchcostumeto: 'コスチュームを [コスチューム1 v] にする',
+    looks_nextcostume: '次のコスチュームにする',
+    looks_switchbackdropto: '背景を [背景1 v] にする',
+    looks_nextbackdrop: '次の背景にする',
+    looks_changesizeby: '大きさを (10) ずつ変える',
+    looks_setsizeto: '大きさを (100) ％にする',
+    looks_changeeffectby: '[色 v] の効果を (25) ずつ変える',
+    looks_seteffectto: '[色 v] の効果を (0) にする',
+    looks_cleargraphiceffects: '画像効果をなくす',
+    looks_show: '表示する',
+    looks_hide: '隠す',
+    looks_gotofrontback: '[前 v] へ移動する',
+    looks_goforwardbackwardlayers: '[前 v] (1) 層',
+    looks_costumenumbername: '(コスチュームの [番号 v])',
+    looks_backdropnumbername: '(背景の [番号 v])',
+    looks_size: '(大きさ)',
+
+    // ---- 音 ----
+    sound_playuntildone: '終わるまで [ニャー v] の音を鳴らす',
+    sound_play: '[ニャー v] の音を鳴らす',
+    sound_stopallsounds: 'すべての音を止める',
+    sound_changeeffectby: '[ピッチ v] の効果を (10) ずつ変える',
+    sound_seteffectto: '[ピッチ v] の効果を (100) にする',
+    sound_cleareffects: '音の効果をなくす',
+    sound_changevolumeby: '音量を (-10) ずつ変える',
+    sound_setvolumeto: '音量を (100) ％にする',
+    sound_volume: '(音量)',
+
+    // ---- 制御 ----
+    control_wait: '(1) 秒待つ',
+    control_repeat: '(10) 回繰り返す {}',
+    control_forever: 'ずっと {}',
+    control_if: 'もし <> なら {}',
+    control_if_else: 'もし <> なら {} でなければ {}',
+    control_wait_until: '<> まで待つ',
+    control_repeat_until: '<> まで繰り返す {}',
+    control_stop: '[すべてを止める v]',
+    control_start_as_clone: 'クローンされたとき',
+    control_create_clone_of: '[自分自身 v] のクローンを作る',
+    control_delete_this_clone: 'このクローンを削除する',
+
+    // ---- 調べる ----
+    sensing_touchingobject: '<[マウスのポインター v] に触れた?>',
+    sensing_touchingcolor: '<[#ff0000] 色に触れた?>',
+    sensing_coloristouchingcolor: '<[#ff0000] 色が [#0000ff] 色に触れた?>',
+    sensing_distanceto: '([マウスのポインター v] までの距離)',
+    sensing_askandwait: '[名前はなんですか？] と聞いて待つ',
+    sensing_answer: '(答え)',
+    sensing_keypressed: '<[スペース v] キーが押された>',
+    sensing_mousedown: '<マウスが押された>',
+    sensing_mousex: '(マウスのx座標)',
+    sensing_mousey: '(マウスのy座標)',
+    sensing_setdragmode: 'ドラッグ [できる v] ようにする',
+    sensing_loudness: '(音量)',
+    sensing_timer: '(タイマー)',
+    sensing_resettimer: 'タイマーをリセット',
+    sensing_dayssince2000: '(2000年からの日数)',
+    sensing_username: '(ユーザー名)',
+
+    // ---- 演算 ----
+    operator_add: '((1) + (2))',
+    operator_subtract: '((1) - (2))',
+    operator_multiply: '((1) * (2))',
+    operator_divide: '((1) / (2))',
+    operator_random: '((1) から (10) までの乱数)',
+    operator_gt: '<(1) > (2)>',
+    operator_lt: '<(1) < (2)>',
+    operator_equals: '<(1) = (2)>',
+    operator_and: '<<> かつ <>>',
+    operator_or: '<<> または <>>',
+    operator_not: '<(  ) ではない>',
+    operator_join: '([こんにちは ] と [世界])',
+    operator_letter_of: '([りんご] の (1) 番目の文字)',
+    operator_length: '([りんご] の長さ)',
+    operator_contains: '<[りんご] に [り] が含まれる>',
+    operator_mod: '((10) を (3) で割った余り)',
+    operator_round: '((3.4) を四捨五入)',
+    operator_mathop: '([sqrt v] の (9))',
+
+    // ---- 変数 ----
+    data_variable: '(変数)',
+    data_setvariableto: '[変数 v] を (0) にする',
+    data_changevariableby: '[変数 v] を (1) ずつ変える',
+    data_showvariable: '変数 [変数 v] を表示する',
+    data_hidevariable: '変数 [変数 v] を隠す',
+
+    // ---- リスト ----
+    data_listcontents: '(リスト)',
+    data_addtolist: '[もの] を [リスト v] に追加する',
+    data_deleteoflist: '[リスト v] の (1) 番目を削除する',
+    data_deletealloflist: '[リスト v] のすべてを削除する',
+    data_insertatlist: '[リスト v] の (1) 番目に [もの] を挿入する',
+    data_replaceitemoflist: '[リスト v] の (1) 番目を [もの] で置き換える',
+    data_itemoflist: '([リスト v] の (1) 番目)',
+    data_itemnumoflist: '([リスト v] の中の [もの] の場所)',
+    data_lengthoflist: '([リスト v] の長さ)',
+    data_listcontainsitem: '<[リスト v] に [もの] が含まれる>',
+    data_showlist: 'リスト [リスト v] を表示する',
+    data_hidelist: 'リスト [リスト v] を隠す',
+
+    // ---- ペン拡張 ----
+    pen_clear: '全部消す',
+    pen_stamp: 'スタンプ',
+    pen_penDown: 'ペンを下ろす',
+    pen_penUp: 'ペンを上げる',
+    pen_setPenColorToColor: 'ペンの色を [#ff0000] にする',
+    pen_changePenColorParamBy: 'ペンの [色 v] を (10) ずつ変える',
+    pen_setPenColorParamTo: 'ペンの [色 v] を (50) にする',
+    pen_changePenSizeBy: 'ペンの太さを (1) ずつ変える',
+    pen_setPenSizeTo: 'ペンの太さを (1) にする'
+};
+
+export const BLOCK_LABELS = EN;
+export const BLOCK_LABELS_JA = JA;
+
+export const getBlockLabel = (opcode, lang) => {
+    if (lang && lang.startsWith('ja')) {
+        return JA[opcode] || EN[opcode];
+    }
+    return EN[opcode];
 };

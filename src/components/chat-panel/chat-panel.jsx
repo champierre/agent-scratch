@@ -1,28 +1,42 @@
 import React, {useEffect, useRef, useState} from 'react';
 import scratchblocks from 'scratchblocks';
-import {BLOCK_LABELS} from '../../agent/block-labels.js';
+import jaLocale from 'scratchblocks/locales/ja.json';
+import jaHiraLocale from 'scratchblocks/locales/ja-Hira.json';
+import {BLOCK_LABELS, getBlockLabel} from '../../agent/block-labels.js';
 import './chat-panel.css';
+
+// 日本語ロケールを登録
+scratchblocks.loadLanguages({'ja': jaLocale, 'ja-Hira': jaHiraLocale});
+
+// ブラウザの言語設定からscratchblocksに渡すlanguagesを決定
+const getSbLanguages = () => {
+    const lang = (navigator.language || 'en').toLowerCase();
+    if (lang.startsWith('ja')) return ['ja', 'en'];
+    return ['en'];
+};
 
 // opcode を scratchblocks SVG に変換するコンポーネント
 const OPCODE_RE = /\b([a-z]+_[a-zA-Z]+)\b/g;
+const SB_LANGUAGES = getSbLanguages();
 
 const BlockImage = ({opcode, keyStr}) => {
     const ref = useRef(null);
-    const label = BLOCK_LABELS[opcode];
+    const lang = navigator.language || 'en';
+    const label = getBlockLabel(opcode, lang);
     if (!label) return <code key={keyStr}>{opcode}</code>;
 
     useEffect(() => {
         if (!ref.current) return;
         ref.current.innerHTML = '';
-        const doc = scratchblocks.parse(label, {languages: ['en']});
-        const svg = scratchblocks.render(doc, {style: 'scratch3', scale: 0.75});
+        const doc = scratchblocks.parse(label, {languages: SB_LANGUAGES});
+        const svg = scratchblocks.render(doc, {style: 'scratch3', scale: 0.5});
         ref.current.appendChild(svg);
     }, [label]);
 
     return (
         <span
             ref={ref}
-            style={{display: 'inline-block', verticalAlign: 'middle', margin: '0 2px'}}
+            style={{display: 'inline-block', verticalAlign: 'middle', margin: '0 1px'}}
             title={opcode}
         />
     );
