@@ -138,7 +138,10 @@ const runDeepSeekAgent = async ({
     const handlers = createToolHandlers(vm);
     const activeTools = blocksEnabled ? TOOLS : TOOLS.filter(t => !BLOCK_TOOL_NAMES.has(t.name));
     const oaiTools = toOpenAITools(activeTools);
-    const systemMessages = [{role: 'system', content: SYSTEM_PROMPT}];
+    const systemContent = blocksEnabled
+        ? SYSTEM_PROMPT
+        : SYSTEM_PROMPT + '\n\n# 重要な制約\nブロック操作は現在ユーザーによって無効化されています。set_scripts は絶対に使わないでください。会話やスプライト追加など、ブロック操作以外の対応のみ行ってください。';
+    const systemMessages = [{role: 'system', content: systemContent}];
 
     apiMessages.push({role: 'user', content: [{type: 'text', text: userText}]});
 
@@ -314,7 +317,10 @@ export const runAgent = async ({
     const handlers = createToolHandlers(vm);
 
     // システムプロンプトとツール定義は固定 → prompt caching
-    const system = [{type: 'text', text: SYSTEM_PROMPT, cache_control: {type: 'ephemeral'}}];
+    const systemText = blocksEnabled
+        ? SYSTEM_PROMPT
+        : SYSTEM_PROMPT + '\n\n# 重要な制約\nブロック操作は現在ユーザーによって無効化されています。set_scripts は絶対に使わないでください。会話やスプライト追加など、ブロック操作以外の対応のみ行ってください。';
+    const system = [{type: 'text', text: systemText, cache_control: {type: 'ephemeral'}}];
     const activeTools = blocksEnabled ? TOOLS : TOOLS.filter(t => !BLOCK_TOOL_NAMES.has(t.name));
     const tools = activeTools.map((tool, i) =>
         (i === activeTools.length - 1 ? {...tool, cache_control: {type: 'ephemeral'}} : tool)
