@@ -152,7 +152,7 @@ const EN = {
 
 const JA = {
     // ---- イベント ----
-    event_whenflagclicked: '旗が押されたとき',
+    event_whenflagclicked: '@greenFlag が押されたとき',
     event_whenkeypressed: '[スペース v] キーが押されたとき',
     event_whenthisspriteclicked: 'このスプライトが押されたとき',
     event_whenstageclicked: 'ステージが押されたとき',
@@ -164,8 +164,8 @@ const JA = {
 
     // ---- 動き ----
     motion_movesteps: '(10) 歩動かす',
-    motion_turnright: '右に (15) 度回す',
-    motion_turnleft: '左に (15) 度回す',
+    motion_turnright: '@turnRight (15) 度回す',
+    motion_turnleft: '@turnLeft (15) 度回す',
     motion_goto: '[ランダムな位置 v] へ行く',
     motion_gotoxy: 'x座標を (0) 、y座標を (0) にする',
     motion_glideto: '(1) 秒で [ランダムな位置 v] へ行く',
@@ -178,9 +178,9 @@ const JA = {
     motion_sety: 'y座標を (0) にする',
     motion_ifonedgebounce: 'もし端に着いたら、跳ね返る',
     motion_setrotationstyle: '回転方法を [左右のみ v] にする',
-    motion_xposition: '(x座標)',
-    motion_yposition: '(y座標)',
-    motion_direction: '(向き)',
+    motion_xposition: '(x座標 :: motion)',
+    motion_yposition: '(y座標 :: motion)',
+    motion_direction: '(向き :: motion)',
 
     // ---- 見た目 ----
     looks_sayforsecs: '[こんにちは！] と (2) 秒言う',
@@ -190,19 +190,19 @@ const JA = {
     looks_switchcostumeto: 'コスチュームを [コスチューム1 v] にする',
     looks_nextcostume: '次のコスチュームにする',
     looks_switchbackdropto: '背景を [背景1 v] にする',
-    looks_nextbackdrop: '次の背景にする',
+    looks_nextbackdrop: '次の背景にする :: looks',
     looks_changesizeby: '大きさを (10) ずつ変える',
-    looks_setsizeto: '大きさを (100) ％にする',
+    looks_setsizeto: '大きさを (100) %にする',
     looks_changeeffectby: '[色 v] の効果を (25) ずつ変える',
     looks_seteffectto: '[色 v] の効果を (0) にする',
     looks_cleargraphiceffects: '画像効果をなくす',
     looks_show: '表示する',
     looks_hide: '隠す',
     looks_gotofrontback: '[前 v] へ移動する',
-    looks_goforwardbackwardlayers: '[前 v] (1) 層',
+    looks_goforwardbackwardlayers: '(1) 層 [前 v]',
     looks_costumenumbername: '(コスチュームの [番号 v])',
     looks_backdropnumbername: '(背景の [番号 v])',
-    looks_size: '(大きさ)',
+    looks_size: '(大きさ :: looks)',
 
     // ---- 音 ----
     sound_playuntildone: '終わるまで [ニャー v] の音を鳴らす',
@@ -212,8 +212,8 @@ const JA = {
     sound_seteffectto: '[ピッチ v] の効果を (100) にする',
     sound_cleareffects: '音の効果をなくす',
     sound_changevolumeby: '音量を (-10) ずつ変える',
-    sound_setvolumeto: '音量を (100) ％にする',
-    sound_volume: '(音量)',
+    sound_setvolumeto: '音量を (100) %にする',
+    sound_volume: '(音量 :: sound)',
 
     // ---- 制御 ----
     control_wait: '(1) 秒待つ',
@@ -223,15 +223,15 @@ const JA = {
     control_if_else: 'もし <> なら {} でなければ {}',
     control_wait_until: '<> まで待つ',
     control_repeat_until: '<> まで繰り返す {}',
-    control_stop: '[すべてを止める v]',
+    control_stop: ' [すべてを止める v]',
     control_start_as_clone: 'クローンされたとき',
     control_create_clone_of: '[自分自身 v] のクローンを作る',
     control_delete_this_clone: 'このクローンを削除する',
 
     // ---- 調べる ----
-    sensing_touchingobject: '<[マウスのポインター v] に触れた?>',
-    sensing_touchingcolor: '<[#ff0000] 色に触れた?>',
-    sensing_coloristouchingcolor: '<[#ff0000] 色が [#0000ff] 色に触れた?>',
+    sensing_touchingobject: '<[マウスのポインター v] に触れた>',
+    sensing_touchingcolor: '<[#ff0000] 色に触れた>',
+    sensing_coloristouchingcolor: '<[#ff0000] 色が [#0000ff] 色に触れた>',
     sensing_distanceto: '([マウスのポインター v] までの距離)',
     sensing_askandwait: '[名前はなんですか？] と聞いて待つ',
     sensing_answer: '(答え)',
@@ -240,7 +240,7 @@ const JA = {
     sensing_mousex: '(マウスのx座標)',
     sensing_mousey: '(マウスのy座標)',
     sensing_setdragmode: 'ドラッグ [できる v] ようにする',
-    sensing_loudness: '(音量)',
+    sensing_loudness: '(音量 :: sensing)',
     sensing_timer: '(タイマー)',
     sensing_resettimer: 'タイマーをリセット',
     sensing_dayssince2000: '(2000年からの日数)',
@@ -257,7 +257,7 @@ const JA = {
     operator_equals: '<(1) = (2)>',
     operator_and: '<<> かつ <>>',
     operator_or: '<<> または <>>',
-    operator_not: '<(  ) ではない>',
+    operator_not: '<() ではない>',
     operator_join: '([こんにちは ] と [世界])',
     operator_letter_of: '([りんご] の (1) 番目の文字)',
     operator_length: '([りんご] の長さ)',
