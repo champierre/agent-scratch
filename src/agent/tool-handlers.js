@@ -65,7 +65,7 @@ const targetSummary = target => {
     return summary;
 };
 
-export const createToolHandlers = vm => ({
+export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
 
     get_project_state: () => ({
         targets: vm.runtime.targets
@@ -155,12 +155,15 @@ export const createToolHandlers = vm => ({
     },
 
     set_scripts: async ({target, scripts}) => {
+        if (!blocksEnabled) {
+            throw new ToolError('ブロック操作は現在オフになっています。');
+        }
         const t = findTarget(vm, target);
         const resolveVariable = makeVariableResolver(vm, t);
 
         // スクリプト内に pen_ ブロックが含まれていたらペン拡張を自動ロード
         const scriptJson = JSON.stringify(scripts);
-        if (scriptJson.includes('"pen_') && !vm.extensionManager.isExtensionLoaded('pen')) {
+        if (scriptJson.includes('"pen_') && !vm.runtime._extensions.isExtensionLoaded('pen')) {
             await vm.extensionManager.loadExtensionURL('pen');
         }
 
