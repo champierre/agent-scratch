@@ -1,16 +1,66 @@
 import React, {useEffect, useRef, useState} from 'react';
+import scratchblocks from 'scratchblocks';
+import {BLOCK_LABELS} from '../../agent/block-labels';
 import './chat-panel.css';
 
-// 行内マークダウン(**太字** と `コード`) をReact要素に変換
+// opcode を scratchblocks SVG に変換するコンポーネント
+const OPCODE_RE = /\b([a-z]+_[a-zA-Z]+)\b/g;
+
+const BlockImage = ({opcode, keyStr}) => {
+    const ref = useRef(null);
+    const label = BLOCK_LABELS[opcode];
+    if (!label) return <code key={keyStr}>{opcode}</code>;
+
+    useEffect(() => {
+        if (!ref.current) return;
+        ref.current.innerHTML = '';
+        const doc = scratchblocks.parse(label, {languages: ['en']});
+        const svg = scratchblocks.render(doc, {style: 'scratch3', scale: 0.75});
+        ref.current.appendChild(svg);
+    }, [label]);
+
+    return (
+        <span
+            ref={ref}
+            style={{display: 'inline-block', verticalAlign: 'middle', margin: '0 2px'}}
+            title={opcode}
+        />
+    );
+};
+
+// テキスト中の opcode を BlockImage に変換
+const renderWithBlocks = (text, keyPrefix) => {
+    const parts = [];
+    let last = 0;
+    let match;
+    OPCODE_RE.lastIndex = 0;
+    while ((match = OPCODE_RE.exec(text)) !== null) {
+        const opcode = match[1];
+        if (!BLOCK_LABELS[opcode]) continue;
+        if (match.index > last) parts.push(text.slice(last, match.index));
+        parts.push(<BlockImage key={`${keyPrefix}-blk-${match.index}`} opcode={opcode} keyStr={`${keyPrefix}-${match.index}`} />);
+        last = match.index + match[0].length;
+    }
+    if (last < text.length) parts.push(text.slice(last));
+    return parts.length > 0 ? parts : [text];
+};
+
+// 行内マークダウン(**太字** と `コード`) + opcode ブロック画像 をReact要素に変換
 const renderInline = (text, keyPrefix) => {
     const parts = [];
     text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).forEach((seg, i) => {
         if (/^\*\*[^*]+\*\*$/.test(seg)) {
-            parts.push(<strong key={`${keyPrefix}-${i}`}>{seg.slice(2, -2)}</strong>);
+            parts.push(<strong key={`${keyPrefix}-${i}`}>{renderWithBlocks(seg.slice(2, -2), `${keyPrefix}-${i}`)}</strong>);
         } else if (/^`[^`]+`$/.test(seg)) {
-            parts.push(<code key={`${keyPrefix}-${i}`}>{seg.slice(1, -1)}</code>);
+            // バッククォート内は opcode として扱いブロック画像に変換
+            const inner = seg.slice(1, -1);
+            if (BLOCK_LABELS[inner]) {
+                parts.push(<BlockImage key={`${keyPrefix}-${i}`} opcode={inner} keyStr={`${keyPrefix}-${i}`} />);
+            } else {
+                parts.push(<code key={`${keyPrefix}-${i}`}>{inner}</code>);
+            }
         } else if (seg) {
-            parts.push(seg);
+            parts.push(...renderWithBlocks(seg, `${keyPrefix}-${i}`));
         }
     });
     return parts;
