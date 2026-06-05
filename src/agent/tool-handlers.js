@@ -65,7 +65,7 @@ const targetSummary = target => {
     return summary;
 };
 
-export const createToolHandlers = vm => ({
+export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
 
     get_project_state: () => ({
         targets: vm.runtime.targets
@@ -155,6 +155,9 @@ export const createToolHandlers = vm => ({
     },
 
     set_scripts: async ({target, scripts}) => {
+        if (!blocksEnabled) {
+            throw new ToolError('ブロック操作は現在オフになっています。');
+        }
         const t = findTarget(vm, target);
         const resolveVariable = makeVariableResolver(vm, t);
 

@@ -29,7 +29,7 @@ const BlockImage = ({opcode, keyStr}) => {
         if (!ref.current) return;
         ref.current.innerHTML = '';
         const doc = scratchblocks.parse(label, {languages: SB_LANGUAGES});
-        const svg = scratchblocks.render(doc, {style: 'scratch3', scale: 0.5});
+        const svg = scratchblocks.render(doc, {style: 'scratch3', scale: 0.65});
         ref.current.appendChild(svg);
     }, [label]);
 

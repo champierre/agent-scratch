@@ -135,7 +135,7 @@ const runDeepSeekAgent = async ({
         timeout: REQUEST_TIMEOUT_MS,
         maxRetries: 1
     });
-    const handlers = createToolHandlers(vm);
+    const handlers = createToolHandlers(vm, {blocksEnabled});
     const activeTools = blocksEnabled ? TOOLS : TOOLS.filter(t => !BLOCK_TOOL_NAMES.has(t.name));
     const oaiTools = toOpenAITools(activeTools);
     const systemMessages = [{role: 'system', content: SYSTEM_PROMPT}];
@@ -311,7 +311,7 @@ export const runAgent = async ({
         timeout: REQUEST_TIMEOUT_MS,
         maxRetries: 1
     });
-    const handlers = createToolHandlers(vm);
+    const handlers = createToolHandlers(vm, {blocksEnabled});
 
     // システムプロンプトとツール定義は固定 → prompt caching
     const system = [{type: 'text', text: SYSTEM_PROMPT, cache_control: {type: 'ephemeral'}}];
