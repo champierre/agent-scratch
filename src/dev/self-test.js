@@ -99,6 +99,21 @@ export const maybeRunSelfTest = vm => {
                 ]
             });
 
+            // ペンブロック(拡張の自動ロード確認)
+            await handlers.set_scripts({
+                target: 'Ball',
+                scripts: [
+                    {blocks: [
+                        {opcode: 'event_whenthisspriteclicked'},
+                        {opcode: 'pen_clear'},
+                        {opcode: 'pen_penDown'},
+                        {opcode: 'pen_stamp'}
+                    ]}
+                ]
+            });
+            console.log('[selftest] pen extension loaded:',
+                vm.extensionManager.isExtensionLoaded('pen'));
+
             // プロパティ設定
             handlers.set_sprite_properties({target: 'Ball', x: 150, y: 100, size: 80});
 

@@ -163,7 +163,9 @@ export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
 
         // スクリプト内に pen_ ブロックが含まれていたらペン拡張を自動ロード
         const scriptJson = JSON.stringify(scripts);
-        if (scriptJson.includes('"pen_') && !vm.runtime._extensions.isExtensionLoaded('pen')) {
+        // 注意: runtime 直下の「_extensions」は存在しない(CLAUDE.md「よくあるハマりポイント」参照)。
+        // 必ず vm.extensionManager.isExtensionLoaded を使うこと(過去2回退行・test/static-checks.js で検出)
+        if (scriptJson.includes('"pen_') && !vm.extensionManager.isExtensionLoaded('pen')) {
             await vm.extensionManager.loadExtensionURL('pen');
         }
 
