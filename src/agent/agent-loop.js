@@ -17,7 +17,12 @@ export const DEFAULT_MODEL = 'deepseek-chat'; // デフォルトモデル
 export const TRIAL_MODEL = 'deepseek-chat';   // お試しモードで使うモデル
 export const getModel = () => localStorage.getItem(MODEL_STORAGE_KEY) || DEFAULT_MODEL;
 export const setModel = model => localStorage.setItem(MODEL_STORAGE_KEY, model);
-export const getDeepSeekApiKey = () => localStorage.getItem(DEEPSEEK_API_KEY_STORAGE_KEY) || '';
+// 開発用APIキー(環境変数から注入。本番ビルドでは空文字)
+export const DEV_ANTHROPIC_KEY = process.env.DEV_ANTHROPIC_API_KEY;
+const DEV_DEEPSEEK_KEY = process.env.DEV_DEEPSEEK_API_KEY;
+
+export const getDeepSeekApiKey = () =>
+    localStorage.getItem(DEEPSEEK_API_KEY_STORAGE_KEY) || DEV_DEEPSEEK_KEY || '';
 export const setDeepSeekApiKey = key => localStorage.setItem(DEEPSEEK_API_KEY_STORAGE_KEY, key);
 export const isDeepSeekModel = model => model && model.startsWith('deepseek-');
 
