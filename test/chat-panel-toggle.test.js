@@ -82,4 +82,6 @@ const main = async () => {
     console.log('chat-panel-toggle ALL TESTS PASSED');
 };
 
-main().catch(e => { console.error(e); process.exit(1); });
+// 成功時も明示的に終了する。React scheduler / jsdom がイベントループに
+// ハンドルを残し、放置するとプロセスが終わらず CI がハングするため
+main().then(() => process.exit(0)).catch(e => { console.error(e); process.exit(1); });
