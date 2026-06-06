@@ -45,7 +45,8 @@ await esbuild.build({
 });
 
 try {
-    execFileSync('node', [out], {stdio: 'inherit'});
+    // timeout 保険: テストが終了しない場合でも 60 秒で打ち切る(CIのハング防止)
+    execFileSync('node', [out], {stdio: 'inherit', timeout: 60000});
 } finally {
     try { (await import('node:fs')).rmSync(out, {force: true}); } catch { /* ignore */ }
 }

@@ -66,3 +66,6 @@ const baseProps = () => ({
 }
 
 console.log('chat-panel-ui ALL TESTS PASSED');
+// React scheduler / jsdom がイベントループにハンドルを残しプロセスが
+// 自然終了しないため、明示的に終了する(CIのハング防止)
+process.exit(0);
