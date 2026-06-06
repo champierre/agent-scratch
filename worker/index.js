@@ -46,6 +46,16 @@ export default {
             return Response.json({error: 'origin not allowed'}, {status: 403, headers: cors.headers});
         }
 
+        // パスワード検証(TRIAL_PASSWORD が設定されている場合のみ有効)
+        const trialPassword = env.TRIAL_PASSWORD || '';
+        if (trialPassword) {
+            const authHeader = request.headers.get('Authorization') || '';
+            const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+            if (token !== trialPassword) {
+                return Response.json({error: 'unauthorized'}, {status: 401, headers: cors.headers});
+            }
+        }
+
         const url = new URL(request.url);
 
         // GET /fetch-url?url=... — 外部URLのコンテンツをテキストで返す

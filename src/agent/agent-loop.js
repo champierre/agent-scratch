@@ -9,7 +9,26 @@ export class AuthError extends Error {}
 
 // 試用モード: キー未入力時に使うプロキシURL(ビルド時に注入。空なら無効)
 const TRIAL_PROXY_URL = process.env.TRIAL_PROXY_URL;
-export const isTrialAvailable = () => Boolean(TRIAL_PROXY_URL);
+
+const TRIAL_TOKEN_KEY = 'agent-scratch-trial-token';
+
+// URLパラメータ ?p=xxx からトークンを読み取り localStorage に保存する(起動時に呼ぶ)
+export const initTrialToken = () => {
+    const params = new URLSearchParams(window.location.search);
+    const p = params.get('p');
+    if (p) {
+        localStorage.setItem(TRIAL_TOKEN_KEY, p);
+        // URL からパラメータを除去(リロード後も残らないよう)
+        params.delete('p');
+        const newUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + window.location.hash;
+        window.history.replaceState({}, '', newUrl);
+    }
+};
+
+export const getTrialToken = () => localStorage.getItem(TRIAL_TOKEN_KEY) || '';
+
+// TRIAL_PROXY_URL が設定されており、かつトークンが保存済みの場合のみ試用モード有効
+export const isTrialAvailable = () => Boolean(TRIAL_PROXY_URL && getTrialToken());
 
 const MODEL_STORAGE_KEY = 'agent-scratch-model';
 const DEEPSEEK_API_KEY_STORAGE_KEY = 'agent-scratch-deepseek-api-key';
@@ -296,11 +315,11 @@ export const runAgent = async ({
 }) => {
     const model = getModel();
 
-    // お試しモード: キー未入力 + プロキシURL設定済み → DeepSeek プロキシ経由
+    // お試しモード: キー未入力 + プロキシURL設定済み + トークン保存済み → DeepSeek プロキシ経由
     const useTrial = !apiKey && !getDeepSeekApiKey() && !getOpenAIApiKey() && isTrialAvailable();
     if (useTrial) {
         return runOpenAICompatAgent({
-            apiKey: 'trial-mode',
+            apiKey: getTrialToken(),
             baseURL: TRIAL_PROXY_URL,
             model: TRIAL_MODEL,
             vm, userText, apiMessages, signal, blocksEnabled,
