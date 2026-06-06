@@ -63,19 +63,33 @@ export default {
             if (!ALLOWED_PROTOCOLS.includes(parsed.protocol)) {
                 return Response.json({error: 'protocol not allowed'}, {status: 400, headers: cors.headers});
             }
-            try {
-                const upstream = await fetch(targetUrl, {
+            // github.com の URL を raw.githubusercontent.com に自動変換
+            // https://github.com/{owner}/{repo}/blob/{branch}/{path}
+            //   → https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}
+            // https://github.com/{owner}/{repo} (ルート) は README.md を取得
+            const ghBlobMatch = parsed.href.match(
+                /^https:\/\/github\.com\/([^/]+\/[^/]+)\/blob\/([^/]+)\/(.+)$/
+            );
+            const ghRootMatch = !ghBlobMatch && parsed.href.match(
+                /^https:\/\/github\.com\/([^/]+\/[^/]+?)\/?(?:#.*)?$/
+            );
+            let resolvedUrl = parsed.href;
+            if (ghBlobMatch) {
+                resolvedUrl = `https://raw.githubusercontent.com/${ghBlobMatch[1]}/${ghBlobMatch[2]}/${ghBlobMatch[3]}`;
+            } else if (ghRootMatch) {
+                // ルートURLはデフォルトブランチの README.md を試みる(main → master の順)
+                resolvedUrl = `https://raw.githubusercontent.com/${ghRootMatch[1]}/main/README.md`;
+            }
+            const fetchText = async (fetchUrl) => {
+                const upstream = await fetch(fetchUrl, {
                     headers: {'User-Agent': 'Mozilla/5.0 (compatible; agent-scratch-bot/1.0)'},
                     redirect: 'follow'
                 });
+                if (!upstream.ok) return {ok: false, status: upstream.status};
                 const contentType = upstream.headers.get('content-type') || '';
-                // バイナリはスキップしてテキスト系のみ返す
                 if (!contentType.includes('text') && !contentType.includes('json') &&
                     !contentType.includes('javascript') && !contentType.includes('xml')) {
-                    return Response.json(
-                        {error: `binary content type: ${contentType}`},
-                        {status: 415, headers: cors.headers}
-                    );
+                    return {ok: false, status: upstream.status, binaryType: contentType};
                 }
                 const reader = upstream.body.getReader();
                 const chunks = [];
@@ -98,8 +112,30 @@ export default {
                         return merged;
                     }, new Uint8Array(0))
                 );
+                return {ok: true, status: upstream.status, contentType, text, truncated: total > FETCH_URL_MAX_BYTES};
+            };
+            try {
+                let result = await fetchText(resolvedUrl);
+                // GitHub ルートURL で main ブランチが 404 の場合 master を試みる
+                if (!result.ok && ghRootMatch && resolvedUrl.includes('/main/README.md')) {
+                    const masterUrl = resolvedUrl.replace('/main/README.md', '/master/README.md');
+                    result = await fetchText(masterUrl);
+                    if (result.ok) resolvedUrl = masterUrl;
+                }
+                if (!result.ok) {
+                    if (result.binaryType) {
+                        return Response.json(
+                            {error: `binary content type: ${result.binaryType}`},
+                            {status: 415, headers: cors.headers}
+                        );
+                    }
+                    return Response.json(
+                        {error: `upstream returned HTTP ${result.status}`},
+                        {status: result.status, headers: cors.headers}
+                    );
+                }
                 return Response.json(
-                    {url: targetUrl, status: upstream.status, content_type: contentType, text, truncated: total > FETCH_URL_MAX_BYTES},
+                    {url: resolvedUrl, original_url: targetUrl, status: result.status, content_type: result.contentType, text: result.text, truncated: result.truncated},
                     {headers: cors.headers}
                 );
             } catch (e) {

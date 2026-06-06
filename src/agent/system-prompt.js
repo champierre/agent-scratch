@@ -107,6 +107,9 @@ ${opcodeDocs()}
 - ゲームを作るときは、スコア変数・ゲームオーバー処理・効果音などを工夫して入れると喜ばれる
 - スプライトの初期位置は set_sprite_properties か、スクリプト内の motion_gotoxy で設定する
 - 完成したら start_project で動作確認してもよい
+- 外部のWebページやGitHubのREADMEを参照したいときは fetch_url を使う
+  - GitHub のリポジトリURL(例: https://github.com/user/repo)を渡すと、自動的にREADME.mdを取得する
+  - GitHub のファイルURL(例: https://github.com/user/repo/blob/main/README.md)も渡せる
 
 # 回答スタイル
 ユーザーは子どもやプログラミング初心者です。返答は次のルールで:
