@@ -119,12 +119,13 @@ export const TOOLS = [
     },
     {
         name: 'set_scripts',
-        description: 'ターゲットのスクリプト(ブロック)全体をDSLで置き換える。そのターゲットの既存スクリプトはすべて消えて新しい内容になるので、残したいスクリプトも含めて全部を指定すること。',
+        description: 'ターゲットのスクリプト(ブロック)をDSLで設定する。append未指定(置換)では既存スクリプトがすべて消えるので、残したいスクリプトも含めて全部を指定すること。1回で組めるのは50ブロックまで。大きな作品は複数回に分け、2回目以降は append: true で既存に追加する。',
         input_schema: {
             type: 'object',
             properties: {
                 target: {type: 'string', description: 'スプライト名または "Stage"'},
-                scripts: SCRIPTS_SCHEMA
+                scripts: SCRIPTS_SCHEMA,
+                append: {type: 'boolean', description: 'trueなら既存スクリプトを残して追加する(デフォルトは置換)'}
             },
             required: ['target', 'scripts']
         }
