@@ -356,3 +356,27 @@ export const findOpcodeByJaName = text => {
     const key = normalizeJaName(text);
     return (key && JA_NAME_TO_OPCODE[key]) || null;
 };
+
+// key が cand の部分列(順序を保って含まれる)か
+// 例: 「回転方法をにする」⊂「回転方法を左右に反転にする」(メニュー値の挿入を許容)
+const isSubsequence = (key, cand) => {
+    let i = 0;
+    for (const ch of cand) {
+        if (ch === key[i]) i++;
+        if (i === key.length) return true;
+    }
+    return i === key.length;
+};
+
+// 「ブロック画像の直後の括弧書き」が同じブロックの言い換えかを判定する。
+// 画像+(同じ日本語名)の二重表示を省くために使う。
+export const isRedundantJaAnnotation = (text, opcode) => {
+    if (findOpcodeByJaName(text) === opcode) return true;
+    const label = JA[opcode];
+    if (!label) return false;
+    const key = normalizeJaName(label);
+    const cand = normalizeJaName(text);
+    if (!key || !cand || key.length < 3) return false;
+    if (cand.length > key.length * 3 + 10) return false; // 長すぎる説明文は別物とみなす
+    return isSubsequence(key, cand);
+};

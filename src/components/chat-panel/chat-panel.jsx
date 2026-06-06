@@ -2,7 +2,7 @@ import React, {useEffect, useRef, useState} from 'react';
 import scratchblocks from 'scratchblocks';
 import jaLocale from 'scratchblocks/locales/ja.json';
 import jaHiraLocale from 'scratchblocks/locales/ja-Hira.json';
-import {BLOCK_LABELS, getBlockLabel, findOpcodeByJaName} from '../../agent/block-labels.js';
+import {BLOCK_LABELS, getBlockLabel, findOpcodeByJaName, isRedundantJaAnnotation} from '../../agent/block-labels.js';
 import './chat-panel.css';
 
 // 日本語ロケールを登録
@@ -63,6 +63,15 @@ const BlockImage = ({opcode, keyStr}) => {
 // ブロック画像に変換する(opcodeで書かないモデルへのロジック側の救済)
 const JA_QUOTED_RE = /「([^「」]{2,40})」/g;
 
+// ブロック画像の直後に「(同じブロックの日本語名)」が続く場合は冗長なので読み飛ばす
+// 例: motion_movesteps(10歩動かす) → 画像のみ表示
+const PAREN_ANNOTATION_RE = /^\s*[（(]([^（）()]{1,50})[）)]/;
+const skipRedundantAnnotation = (text, pos, opcode) => {
+    const m = text.slice(pos).match(PAREN_ANNOTATION_RE);
+    if (m && isRedundantJaAnnotation(m[1], opcode)) return pos + m[0].length;
+    return pos;
+};
+
 const renderJaQuotedBlocks = (text, keyPrefix) => {
     const parts = [];
     let last = 0;
@@ -73,7 +82,8 @@ const renderJaQuotedBlocks = (text, keyPrefix) => {
         if (!opcode) continue;
         if (match.index > last) parts.push(text.slice(last, match.index));
         parts.push(<BlockImage key={`${keyPrefix}-ja-${match.index}`} opcode={opcode} keyStr={`${keyPrefix}-ja-${match.index}`} />);
-        last = match.index + match[0].length;
+        last = skipRedundantAnnotation(text, match.index + match[0].length, opcode);
+        JA_QUOTED_RE.lastIndex = last;
     }
     if (last < text.length) parts.push(text.slice(last));
     return parts.length > 0 ? parts : [text];
@@ -89,7 +99,8 @@ const renderWithBlocks = (text, keyPrefix) => {
         if (!BLOCK_LABELS[opcode]) continue;
         if (match.index > last) parts.push(...renderJaQuotedBlocks(text.slice(last, match.index), `${keyPrefix}-${last}`));
         parts.push(<BlockImage key={`${keyPrefix}-blk-${match.index}`} opcode={opcode} keyStr={`${keyPrefix}-${match.index}`} />);
-        last = match.index + match[0].length;
+        last = skipRedundantAnnotation(text, match.index + match[0].length, opcode);
+        OPCODE_RE.lastIndex = last;
     }
     if (last < text.length) parts.push(...renderJaQuotedBlocks(text.slice(last), `${keyPrefix}-${last}`));
     return parts.length > 0 ? parts : [text];
