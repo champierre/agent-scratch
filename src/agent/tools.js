@@ -142,6 +142,17 @@ export const TOOLS = [
         name: 'stop_project',
         description: 'プロジェクトの実行を止める。',
         input_schema: {type: 'object', properties: {}}
+    },
+    {
+        name: 'fetch_url',
+        description: 'URLのページ内容(テキスト/HTML/Markdown)を取得する。GitHubのREADMEやWebページを参照して内容を説明するときに使う。',
+        input_schema: {
+            type: 'object',
+            properties: {
+                url: {type: 'string', description: '取得するURL(http/https)'}
+            },
+            required: ['url']
+        }
     }
 ];
 
@@ -152,6 +163,7 @@ export const draftingLabel = name => {
     case 'add_sprite': return 'スプライトを選んでいます';
     case 'search_library': return 'ライブラリを探しています';
     case 'set_sprite_properties': return 'スプライトを配置しています';
+    case 'fetch_url': return 'ページを取得しています';
     default: return '次の操作を準備しています';
     }
 };
@@ -171,6 +183,7 @@ export const summarizeToolCall = (name, input) => {
     case 'set_sprite_properties': return `プロパティ設定: ${input.target}`;
     case 'start_project': return 'プロジェクトを実行';
     case 'stop_project': return 'プロジェクトを停止';
+    case 'fetch_url': return `URLを取得: ${input.url}`;
     default: return name;
     }
 };

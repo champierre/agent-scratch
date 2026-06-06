@@ -13,6 +13,11 @@ const ALLOWED_MODELS = [
 
 const MAX_TOKENS_LIMIT = 16000;
 
+// fetch-url: AIが外部URLを取得するために使う。レスポンスは最大200KBのテキスト
+const FETCH_URL_MAX_BYTES = 200 * 1024;
+// 許可するプロトコル(httpとhttpsのみ)
+const ALLOWED_PROTOCOLS = ['https:', 'http:'];
+
 const corsHeaders = (request, allowedOrigins) => {
     const origin = request.headers.get('Origin') || '';
     const allowed = allowedOrigins.includes(origin);
@@ -20,7 +25,7 @@ const corsHeaders = (request, allowedOrigins) => {
         allowed,
         headers: {
             'Access-Control-Allow-Origin': allowed ? origin : allowedOrigins[0],
-            'Access-Control-Allow-Methods': 'POST, OPTIONS',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
             'Access-Control-Allow-Headers':
                 request.headers.get('Access-Control-Request-Headers') || '*',
             'Access-Control-Max-Age': '86400',
@@ -42,6 +47,66 @@ export default {
         }
 
         const url = new URL(request.url);
+
+        // GET /fetch-url?url=... — 外部URLのコンテンツをテキストで返す
+        if (request.method === 'GET' && url.pathname === '/fetch-url') {
+            const targetUrl = url.searchParams.get('url');
+            if (!targetUrl) {
+                return Response.json({error: 'url parameter required'}, {status: 400, headers: cors.headers});
+            }
+            let parsed;
+            try {
+                parsed = new URL(targetUrl);
+            } catch {
+                return Response.json({error: 'invalid url'}, {status: 400, headers: cors.headers});
+            }
+            if (!ALLOWED_PROTOCOLS.includes(parsed.protocol)) {
+                return Response.json({error: 'protocol not allowed'}, {status: 400, headers: cors.headers});
+            }
+            try {
+                const upstream = await fetch(targetUrl, {
+                    headers: {'User-Agent': 'Mozilla/5.0 (compatible; agent-scratch-bot/1.0)'},
+                    redirect: 'follow'
+                });
+                const contentType = upstream.headers.get('content-type') || '';
+                // バイナリはスキップしてテキスト系のみ返す
+                if (!contentType.includes('text') && !contentType.includes('json') &&
+                    !contentType.includes('javascript') && !contentType.includes('xml')) {
+                    return Response.json(
+                        {error: `binary content type: ${contentType}`},
+                        {status: 415, headers: cors.headers}
+                    );
+                }
+                const reader = upstream.body.getReader();
+                const chunks = [];
+                let total = 0;
+                while (true) {
+                    const {done, value} = await reader.read();
+                    if (done) break;
+                    total += value.length;
+                    if (total > FETCH_URL_MAX_BYTES) {
+                        chunks.push(value.slice(0, FETCH_URL_MAX_BYTES - (total - value.length)));
+                        break;
+                    }
+                    chunks.push(value);
+                }
+                const text = new TextDecoder().decode(
+                    chunks.reduce((acc, c) => {
+                        const merged = new Uint8Array(acc.length + c.length);
+                        merged.set(acc);
+                        merged.set(c, acc.length);
+                        return merged;
+                    }, new Uint8Array(0))
+                );
+                return Response.json(
+                    {url: targetUrl, status: upstream.status, content_type: contentType, text, truncated: total > FETCH_URL_MAX_BYTES},
+                    {headers: cors.headers}
+                );
+            } catch (e) {
+                return Response.json({error: `fetch failed: ${e.message}`}, {status: 502, headers: cors.headers});
+            }
+        }
+
         if (request.method !== 'POST' ||
             (url.pathname !== '/v1/chat/completions' && url.pathname !== '/chat/completions')) {
             return Response.json({error: 'not found'}, {status: 404, headers: cors.headers});

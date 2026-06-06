@@ -7,6 +7,13 @@ import {
     searchBackdrops, findBackdropByName
 } from './library-search';
 
+// Worker プロキシのベース URL(TRIAL_PROXY_URL の末尾 /v1/chat/completions 等を除いたもの)
+const WORKER_BASE_URL = (() => {
+    const raw = process.env.TRIAL_PROXY_URL || '';
+    // "https://xxx.workers.dev" 形式に正規化する
+    return raw.replace(/\/(v1\/)?chat\/completions$/, '').replace(/\/$/, '');
+})();
+
 export class ToolError extends Error {}
 
 // name または id でターゲット(スプライト/ステージ)を探す
@@ -217,5 +224,31 @@ export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
     stop_project: () => {
         vm.stopAll();
         return {ok: true};
+    },
+
+    fetch_url: async ({url}) => {
+        if (!url) throw new ToolError('url が必要です');
+        // Worker プロキシが設定されている場合はそちら経由(CORS回避)
+        // 設定されていない場合は直接 fetch(ローカル開発など)
+        const endpoint = WORKER_BASE_URL
+            ? `${WORKER_BASE_URL}/fetch-url?url=${encodeURIComponent(url)}`
+            : url;
+        let res;
+        try {
+            res = await fetch(endpoint);
+        } catch (e) {
+            throw new ToolError(`ネットワークエラー: ${e.message}`);
+        }
+        if (!res.ok) {
+            let errMsg = `HTTP ${res.status}`;
+            try { const body = await res.json(); errMsg = body.error || errMsg; } catch { /* ignore */ }
+            throw new ToolError(`取得失敗: ${errMsg}`);
+        }
+        const data = WORKER_BASE_URL ? await res.json() : {text: await res.text(), truncated: false};
+        return {
+            url,
+            text: data.text,
+            truncated: data.truncated || false
+        };
     }
 });
