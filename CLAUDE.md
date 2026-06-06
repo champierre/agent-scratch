@@ -48,6 +48,7 @@ npm start              # http://localhost:8602/
 - AI の返答中の opcode（`looks_hide` 等）を scratchblocks SVG に変換
 - ブラウザ言語が `ja` の場合は日本語ラベルで表示
 - 日本語ラベルは `src/agent/block-labels.js` の `JA` オブジェクトで管理
+- AI が opcode でなく日本語名(「ずっと」等)で書いた場合も、カギ括弧内の文字列を `findOpcodeByJaName`(JA ラベルからの自動生成逆引き+エイリアス)で解決してブロック画像化する。よくある言い換えは `JA_NAME_ALIASES` に追加する
 - **重要**: 日本語ラベルは scratchblocks ロケールファイル（`locales/ja.json`）の文字列と正確に一致させること。`@greenFlag`、`@turnRight` などのアイコン参照も含める
 
 ### システムプロンプト (`src/agent/system-prompt.js`)
