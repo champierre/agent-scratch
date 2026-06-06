@@ -13,6 +13,9 @@ const WORKER_BASE_URL = (() => {
     return raw.replace(/\/(v1\/)?chat\/completions$/, '').replace(/\/$/, '');
 })();
 
+const TRIAL_TOKEN_KEY = 'agent-scratch-trial-token';
+const getTrialToken = () => localStorage.getItem(TRIAL_TOKEN_KEY) || '';
+
 export class ToolError extends Error {}
 
 // name または id でターゲット(スプライト/ステージ)を探す
@@ -243,9 +246,10 @@ export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
         const endpoint = WORKER_BASE_URL
             ? `${WORKER_BASE_URL}/fetch-url?url=${encodeURIComponent(url)}`
             : url;
+        const token = getTrialToken();
         let res;
         try {
-            res = await fetch(endpoint);
+            res = await fetch(endpoint, token ? {headers: {Authorization: `Bearer ${token}`}} : undefined);
         } catch (e) {
             throw new ToolError(`ネットワークエラー: ${e.message}`);
         }
