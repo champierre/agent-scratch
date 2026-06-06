@@ -164,7 +164,7 @@ const runOpenAICompatAgent = async ({
         baseURL: baseURL || 'https://api.deepseek.com',
         dangerouslyAllowBrowser: true,
         timeout: REQUEST_TIMEOUT_MS,
-        maxRetries: 1,
+        maxRetries: 2, // 503等の一時エラーに耐えるため(指数バックオフで自動再試行)
         ...(stripSdkHeaders ? {defaultHeaders: STRIP_STAINLESS_HEADERS} : {})
     });
     const handlers = createToolHandlers(vm, {blocksEnabled});
@@ -236,6 +236,12 @@ const runOpenAICompatAgent = async ({
         } catch (e) {
             if (e?.status === 401 || e?.code === 'invalid_api_key') throw new AuthError(e.message);
             if (e?.status === 429) throw new Error('混み合っています。少し待ってからもう一度試してください。');
+            if (e?.status >= 500) {
+                // Gemini等で頻発する一時的なサーバ過負荷(503など)
+                throw new Error(
+                    `AIサーバが混み合っているか一時的に不調です(${e.status})。` +
+                    '少し待ってから、同じ内容をもう一度送ってください。');
+            }
             if (e?.name === 'AbortError' || e?.name === 'APIUserAbortError') return;
             throw e;
         }
@@ -428,6 +434,11 @@ export const runAgent = async ({
             }
             if (e instanceof Anthropic.RateLimitError) {
                 throw new Error('混み合っています。少し待ってからもう一度試してください。');
+            }
+            if (e instanceof Anthropic.InternalServerError) {
+                throw new Error(
+                    `AIサーバが混み合っているか一時的に不調です(${e.status})。` +
+                    '少し待ってから、同じ内容をもう一度送ってください。');
             }
             // adaptive thinking 未対応モデルへのフォールバック
             if (useThinking && e instanceof Anthropic.BadRequestError &&
