@@ -279,7 +279,7 @@ const runOpenAICompatAgent = async ({
                     console.error(`tool ${tc.function.name} failed:`, e); // eslint-disable-line no-console
                 }
             }
-            onToolEnd(!isError);
+            onToolEnd(!isError, isError ? String(result.error) : undefined);
             toolResults.push({
                 type: 'tool_result',
                 tool_use_id: tc.id,
@@ -478,7 +478,7 @@ export const runAgent = async ({
                     console.error(`tool ${block.name} failed:`, e); // eslint-disable-line no-console
                 }
             }
-            onToolEnd(!isError);
+            onToolEnd(!isError, isError ? String(result.error) : undefined);
             toolResults.push({
                 type: 'tool_result',
                 tool_use_id: block.id,

@@ -161,17 +161,48 @@ const renderMarkdownLite = text => {
     return result;
 };
 
-const MessageRow = ({message}) => {
-    if (message.role === 'tool') {
-        return (
-            <div className="as-chat-message as-chat-tool">
+// ツール行(エラー時はクリックで詳細を開閉し、コピーできる)
+const ToolRow = ({message}) => {
+    const [expanded, setExpanded] = useState(false);
+    const [copied, setCopied] = useState(false);
+    const hasDetail = message.status === 'error' && message.detail;
+
+    const copyDetail = e => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(message.detail).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+        });
+    };
+
+    return (
+        <div className="as-chat-tool-wrap">
+            <div
+                className={`as-chat-message as-chat-tool${hasDetail ? ' as-chat-tool-clickable' : ''}`}
+                title={hasDetail ? 'クリックでエラー内容を表示' : undefined}
+                onClick={hasDetail ? () => setExpanded(v => !v) : undefined}
+            >
                 <span className="as-chat-tool-icon">🔧</span>
                 <span className="as-chat-tool-text">{message.text}</span>
                 {message.status === 'running' && <span className="as-chat-tool-spinner" />}
                 {message.status === 'error' && <span className="as-chat-tool-status">⚠️</span>}
                 {message.status === 'done' && <span className="as-chat-tool-status">✓</span>}
             </div>
-        );
+            {expanded && hasDetail && (
+                <div className="as-chat-tool-detail">
+                    <pre className="as-chat-tool-detail-text">{message.detail}</pre>
+                    <button className="as-chat-tool-copy" onClick={copyDetail}>
+                        {copied ? 'コピーしました ✓' : 'コピー'}
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+};
+
+const MessageRow = ({message}) => {
+    if (message.role === 'tool') {
+        return <ToolRow message={message} />;
     }
     if (message.role === 'error') {
         return <div className="as-chat-message as-chat-error">{message.text}</div>;

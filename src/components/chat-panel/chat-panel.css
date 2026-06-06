@@ -245,3 +245,41 @@
 .as-chat-suggestion-badge:hover {
     background: #e0d4f7;
 }
+
+.as-chat-tool-wrap {
+    align-self: flex-start;
+    max-width: 90%;
+}
+
+.as-chat-tool-clickable {
+    cursor: pointer;
+}
+
+.as-chat-tool-detail {
+    margin-top: 4px;
+    background: #fff3f2;
+    border: 1px solid #f3b6b1;
+    border-radius: 8px;
+    padding: 8px;
+}
+
+.as-chat-tool-detail-text {
+    margin: 0 0 6px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-family: Menlo, Consolas, monospace;
+    font-size: 11px;
+    color: #8c2f28;
+    max-height: 160px;
+    overflow-y: auto;
+}
+
+.as-chat-tool-copy {
+    border: 1px solid #d99;
+    background: white;
+    color: #8c2f28;
+    border-radius: 6px;
+    padding: 3px 10px;
+    font-size: 11px;
+    cursor: pointer;
+}
