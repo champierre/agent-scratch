@@ -283,3 +283,13 @@
     font-size: 11px;
     cursor: pointer;
 }
+
+.as-chat-collapse-button {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px 6px 2px 0;
+    line-height: 1;
+}

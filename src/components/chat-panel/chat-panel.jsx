@@ -285,6 +285,8 @@ const SUGGESTIONS = [
 ];
 
 const ChatPanel = ({
+    collapsed,
+    onToggleCollapse,
     messages,
     running,
     drafting,
@@ -351,9 +353,16 @@ const ChatPanel = ({
         }
     };
 
+    if (collapsed) return null;
+
     return (
         <div className="as-chat-panel">
             <div className="as-chat-header">
+                <button
+                    className="as-chat-collapse-button"
+                    title="AI アシスタントを閉じる"
+                    onClick={onToggleCollapse}
+                >▶</button>
                 <span className="as-chat-title">AI アシスタント</span>
                 <button
                     className="as-chat-settings-button"
