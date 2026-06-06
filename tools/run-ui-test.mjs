@@ -23,6 +23,15 @@ const stubScratchblocks = {
     }
 };
 
+// agent-loop を実API呼び出しのないスタブに差し替える(runAgentの引数を記録できる)
+const stubAgentLoop = {
+    name: 'stub-agent-loop',
+    setup(build) {
+        const stubPath = path.join(root, 'test/stubs/agent-loop-stub.js');
+        build.onResolve({filter: /\/agent-loop$/}, () => ({path: stubPath}));
+    }
+};
+
 await esbuild.build({
     entryPoints: [entry],
     bundle: true,
@@ -30,7 +39,7 @@ await esbuild.build({
     format: 'cjs',
     outfile: out,
     loader: {'.js': 'jsx', '.css': 'empty'},
-    plugins: [stubScratchblocks],
+    plugins: [stubScratchblocks, stubAgentLoop],
     external: ['jsdom'],
     logLevel: 'error'
 });
