@@ -33,11 +33,13 @@ export const isTrialAvailable = () => Boolean(TRIAL_PROXY_URL && getTrialToken()
 const MODEL_STORAGE_KEY = 'agent-scratch-model';
 const DEEPSEEK_API_KEY_STORAGE_KEY = 'agent-scratch-deepseek-api-key';
 const OPENAI_API_KEY_STORAGE_KEY = 'agent-scratch-openai-api-key';
+const GEMINI_API_KEY_STORAGE_KEY = 'agent-scratch-gemini-api-key';
 
 // ローカル開発用キー(.env から webpack DefinePlugin で注入。未設定なら空文字)
 export const DEV_ANTHROPIC_KEY = process.env.DEV_ANTHROPIC_API_KEY || '';
 const DEV_DEEPSEEK_KEY = process.env.DEV_DEEPSEEK_API_KEY || '';
 const DEV_OPENAI_KEY = process.env.DEV_OPENAI_API_KEY || '';
+const DEV_GEMINI_KEY = process.env.DEV_GEMINI_API_KEY || '';
 
 export const DEFAULT_MODEL = 'deepseek-chat'; // デフォルトモデル
 export const TRIAL_MODEL = 'deepseek-chat';   // お試しモードで使うモデル
@@ -49,6 +51,9 @@ export const isDeepSeekModel = model => model && model.startsWith('deepseek-');
 export const getOpenAIApiKey = () => localStorage.getItem(OPENAI_API_KEY_STORAGE_KEY) || DEV_OPENAI_KEY;
 export const setOpenAIApiKey = key => localStorage.setItem(OPENAI_API_KEY_STORAGE_KEY, key);
 export const isOpenAIModel = model => model && model.startsWith('gpt-');
+export const getGeminiApiKey = () => localStorage.getItem(GEMINI_API_KEY_STORAGE_KEY) || DEV_GEMINI_KEY;
+export const setGeminiApiKey = key => localStorage.setItem(GEMINI_API_KEY_STORAGE_KEY, key);
+export const isGeminiModel = model => model && model.startsWith('gemini-');
 
 const MAX_ITERATIONS = 30;
 const MAX_TOKENS = 16000;
@@ -117,12 +122,28 @@ const anthropicToOpenAIMessages = messages => {
     return result;
 };
 
+// OpenAI SDK が自動付与する x-stainless-* ヘッダの除去指定。
+// Google の OpenAI 互換エンドポイントはこれらを CORS で許可しておらず、
+// 付いているとプリフライトが 403 になり "Connection error." で失敗する
+const STRIP_STAINLESS_HEADERS = {
+    'x-stainless-arch': null,
+    'x-stainless-lang': null,
+    'x-stainless-os': null,
+    'x-stainless-package-version': null,
+    'x-stainless-retry-count': null,
+    'x-stainless-runtime': null,
+    'x-stainless-runtime-version': null,
+    'x-stainless-timeout': null,
+    'x-stainless-helper-method': null
+};
+
 /**
- * OpenAI互換 (DeepSeek / OpenAI 共用) エージェントループ
+ * OpenAI互換 (DeepSeek / OpenAI / Gemini 共用) エージェントループ
  */
 const runOpenAICompatAgent = async ({
     apiKey: compatApiKey,
     baseURL,
+    stripSdkHeaders,
     model: modelOverride,
     vm,
     userText,
@@ -143,7 +164,8 @@ const runOpenAICompatAgent = async ({
         baseURL: baseURL || 'https://api.deepseek.com',
         dangerouslyAllowBrowser: true,
         timeout: REQUEST_TIMEOUT_MS,
-        maxRetries: 1
+        maxRetries: 2, // 503等の一時エラーに耐えるため(指数バックオフで自動再試行)
+        ...(stripSdkHeaders ? {defaultHeaders: STRIP_STAINLESS_HEADERS} : {})
     });
     const handlers = createToolHandlers(vm, {blocksEnabled});
     const activeTools = blocksEnabled ? TOOLS : TOOLS.filter(t => !BLOCK_TOOL_NAMES.has(t.name));
@@ -214,6 +236,12 @@ const runOpenAICompatAgent = async ({
         } catch (e) {
             if (e?.status === 401 || e?.code === 'invalid_api_key') throw new AuthError(e.message);
             if (e?.status === 429) throw new Error('混み合っています。少し待ってからもう一度試してください。');
+            if (e?.status >= 500) {
+                // Gemini等で頻発する一時的なサーバ過負荷(503など)
+                throw new Error(
+                    `AIサーバが混み合っているか一時的に不調です(${e.status})。` +
+                    '少し待ってから、同じ内容をもう一度送ってください。');
+            }
             if (e?.name === 'AbortError' || e?.name === 'APIUserAbortError') return;
             throw e;
         }
@@ -286,7 +314,7 @@ export const runAgent = async ({
     const model = getModel();
 
     // お試しモード: キー未入力 + プロキシURL設定済み + トークン保存済み → DeepSeek プロキシ経由
-    const useTrial = !apiKey && !getDeepSeekApiKey() && !getOpenAIApiKey() && isTrialAvailable();
+    const useTrial = !apiKey && !getDeepSeekApiKey() && !getOpenAIApiKey() && !getGeminiApiKey() && isTrialAvailable();
     if (useTrial) {
         return runOpenAICompatAgent({
             apiKey: getTrialToken(),
@@ -317,6 +345,20 @@ export const runAgent = async ({
         return runOpenAICompatAgent({
             apiKey: openaiApiKey,
             baseURL: 'https://api.openai.com/v1',
+            vm, userText, apiMessages, signal, blocksEnabled,
+            onAssistantStart, onAssistantDelta, onAssistantText,
+            onToolStart, onToolEnd, onToolDrafting
+        });
+    }
+
+    // Google Gemini モデルもOpenAI互換エンドポイント経由で同じループへ
+    if (isGeminiModel(model)) {
+        const geminiApiKey = getGeminiApiKey();
+        if (!geminiApiKey) throw new AuthError('Gemini APIキーが設定されていません。⚙️ から設定してください。');
+        return runOpenAICompatAgent({
+            apiKey: geminiApiKey,
+            baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai',
+            stripSdkHeaders: true,
             vm, userText, apiMessages, signal, blocksEnabled,
             onAssistantStart, onAssistantDelta, onAssistantText,
             onToolStart, onToolEnd, onToolDrafting
@@ -392,6 +434,11 @@ export const runAgent = async ({
             }
             if (e instanceof Anthropic.RateLimitError) {
                 throw new Error('混み合っています。少し待ってからもう一度試してください。');
+            }
+            if (e instanceof Anthropic.InternalServerError) {
+                throw new Error(
+                    `AIサーバが混み合っているか一時的に不調です(${e.status})。` +
+                    '少し待ってから、同じ内容をもう一度送ってください。');
             }
             // adaptive thinking 未対応モデルへのフォールバック
             if (useThinking && e instanceof Anthropic.BadRequestError &&

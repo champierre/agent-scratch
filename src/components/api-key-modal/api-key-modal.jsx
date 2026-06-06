@@ -1,5 +1,5 @@
 import React, {useState} from 'react';
-import {isDeepSeekModel, isOpenAIModel} from '../../agent/agent-loop';
+import {isDeepSeekModel, isOpenAIModel, isGeminiModel} from '../../agent/agent-loop';
 import './api-key-modal.css';
 
 const MODELS = [
@@ -10,23 +10,29 @@ const MODELS = [
     {id: 'claude-opus-4-8', label: 'Claude Opus 4.8(最高性能・高コスト)', provider: 'anthropic'},
     {id: 'gpt-5.1', label: 'GPT-5.1(高性能)', provider: 'openai'},
     {id: 'gpt-5-mini', label: 'GPT-5 mini(低コスト)', provider: 'openai'},
-    {id: 'gpt-5-nano', label: 'GPT-5 nano(最速・最安)', provider: 'openai'}
+    {id: 'gpt-5-nano', label: 'GPT-5 nano(最速・最安)', provider: 'openai'},
+    {id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro(高性能)', provider: 'gemini'},
+    {id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash(バランス型)', provider: 'gemini'},
+    {id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite(最速・最安)', provider: 'gemini'}
 ];
 
-const ApiKeyModal = ({initialApiKey, initialDeepSeekApiKey, initialOpenAIApiKey, initialModel, onSave, onClose}) => {
+const ApiKeyModal = ({initialApiKey, initialDeepSeekApiKey, initialOpenAIApiKey, initialGeminiApiKey, initialModel, onSave, onClose}) => {
     const [value, setValue] = useState(initialApiKey || '');
     const [deepseekValue, setDeepseekValue] = useState(initialDeepSeekApiKey || '');
     const [openaiValue, setOpenaiValue] = useState(initialOpenAIApiKey || '');
+    const [geminiValue, setGeminiValue] = useState(initialGeminiApiKey || '');
     const [model, setModelValue] = useState(initialModel || MODELS[0].id);
 
     const needsDeepSeek = isDeepSeekModel(model);
     const needsOpenAI = isOpenAIModel(model);
+    const needsGemini = isGeminiModel(model);
     const canSave = needsDeepSeek ? deepseekValue.trim() :
-        needsOpenAI ? openaiValue.trim() : value.trim();
+        needsOpenAI ? openaiValue.trim() :
+            needsGemini ? geminiValue.trim() : value.trim();
 
     const save = () => {
         if (!canSave) return;
-        onSave(value.trim(), model, deepseekValue.trim(), openaiValue.trim());
+        onSave(value.trim(), model, deepseekValue.trim(), openaiValue.trim(), geminiValue.trim());
     };
 
     return (
@@ -56,10 +62,15 @@ const ApiKeyModal = ({initialApiKey, initialDeepSeekApiKey, initialOpenAIApiKey,
                                     <option key={m.id} value={m.id}>{m.label}</option>
                                 ))}
                             </optgroup>
+                            <optgroup label="Google (Gemini)">
+                                {MODELS.filter(m => m.provider === 'gemini').map(m => (
+                                    <option key={m.id} value={m.id}>{m.label}</option>
+                                ))}
+                            </optgroup>
                         </select>
                     </label>
 
-                    {!needsDeepSeek && !needsOpenAI && (
+                    {!needsDeepSeek && !needsOpenAI && !needsGemini && (
                         <>
                             <p style={{marginTop: '12px'}}>
                                 Claude を利用するための Anthropic API キーを入力してください。
@@ -118,6 +129,27 @@ const ApiKeyModal = ({initialApiKey, initialDeepSeekApiKey, initialOpenAIApiKey,
                             />
                             <p className="as-modal-hint">
                                 API キーは <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer">OpenAI Platform</a> で取得できます。
+                            </p>
+                        </>
+                    )}
+
+                    {needsGemini && (
+                        <>
+                            <p style={{marginTop: '12px'}}>
+                                Google Gemini API キーを入力してください。
+                                キーはこのブラウザの localStorage にのみ保存されます。
+                            </p>
+                            <input
+                                type="password"
+                                className="as-modal-input"
+                                placeholder="AIza..."
+                                value={geminiValue}
+                                autoFocus
+                                onChange={e => setGeminiValue(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') save(); }}
+                            />
+                            <p className="as-modal-hint">
+                                API キーは <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer">Google AI Studio</a> で取得できます。
                             </p>
                         </>
                     )}
