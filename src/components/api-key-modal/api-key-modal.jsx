@@ -3,7 +3,7 @@ import {isDeepSeekModel, isOpenAIModel} from '../../agent/agent-loop';
 import './api-key-modal.css';
 
 const MODELS = [
-    {id: 'deepseek-chat', label: 'DeepSeek V3(低コスト・高性能/デフォルト)', provider: 'deepseek'},
+    {id: 'deepseek-chat', label: 'DeepSeek V3(低コスト・高性能) ★推奨', provider: 'deepseek'},
     {id: 'deepseek-reasoner', label: 'DeepSeek R1(推論特化)', provider: 'deepseek'},
     {id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5(最速・最安)', provider: 'anthropic'},
     {id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6(バランス型)', provider: 'anthropic'},
@@ -41,13 +41,13 @@ const ApiKeyModal = ({initialApiKey, initialDeepSeekApiKey, initialOpenAIApiKey,
                             value={model}
                             onChange={e => setModelValue(e.target.value)}
                         >
-                            <optgroup label="Anthropic (Claude)">
-                                {MODELS.filter(m => m.provider === 'anthropic').map(m => (
+                            <optgroup label="DeepSeek">
+                                {MODELS.filter(m => m.provider === 'deepseek').map(m => (
                                     <option key={m.id} value={m.id}>{m.label}</option>
                                 ))}
                             </optgroup>
-                            <optgroup label="DeepSeek">
-                                {MODELS.filter(m => m.provider === 'deepseek').map(m => (
+                            <optgroup label="Anthropic (Claude)">
+                                {MODELS.filter(m => m.provider === 'anthropic').map(m => (
                                     <option key={m.id} value={m.id}>{m.label}</option>
                                 ))}
                             </optgroup>

@@ -21,6 +21,7 @@ const ChatPanel = ({vm}) => {
     );
     // ツール入力生成中の進捗表示("ブロックを書いています (1200文字)" など)
     const [drafting, setDrafting] = useState(null);
+    const [currentModel, setCurrentModel] = useState(() => getModel());
     const [sessionCost, setSessionCost] = useState(0);
     const [totalCost, setTotalCost] = useState(
         () => parseFloat(localStorage.getItem(COST_STORAGE_KEY)) || 0
@@ -137,7 +138,7 @@ const ChatPanel = ({vm}) => {
     const handleSaveApiKey = useCallback((key, model, dsKey, oaKey) => {
         localStorage.setItem(STORAGE_KEY, key);
         setApiKey(key);
-        if (model) setModel(model);
+        if (model) { setModel(model); setCurrentModel(model); }
         if (dsKey !== undefined) {
             setDeepSeekApiKey(dsKey);
             setDeepseekApiKeyState(dsKey);
@@ -160,6 +161,7 @@ const ChatPanel = ({vm}) => {
                         isOpenAIModel(getModel()) ? !!openaiApiKey : !!apiKey
                 }
                 trialMode={!apiKey && !deepseekApiKey && !openaiApiKey && isTrialAvailable()}
+                currentModel={currentModel}
                 sessionCost={sessionCost}
                 totalCost={totalCost}
                 blocksEnabled={blocksEnabled}
