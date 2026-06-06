@@ -50,28 +50,6 @@ export const getOpenAIApiKey = () => localStorage.getItem(OPENAI_API_KEY_STORAGE
 export const setOpenAIApiKey = key => localStorage.setItem(OPENAI_API_KEY_STORAGE_KEY, key);
 export const isOpenAIModel = model => model && model.startsWith('gpt-');
 
-// 100万トークンあたりのUSD単価(概算用)。キャッシュ書込は入力の1.25倍、読出は0.1倍
-const PRICING = {
-    'claude-opus-4-8': {input: 5, output: 25},
-    'claude-sonnet-4-6': {input: 3, output: 15},
-    'claude-haiku-4-5-20251001': {input: 1, output: 5},
-    'deepseek-chat': {input: 0.27, output: 1.1},
-    'deepseek-reasoner': {input: 0.55, output: 2.19},
-    'gpt-5.1': {input: 1.25, output: 10},
-    'gpt-5-mini': {input: 0.25, output: 2},
-    'gpt-5-nano': {input: 0.05, output: 0.4}
-};
-
-export const estimateCost = (model, usage) => {
-    const price = PRICING[model] || PRICING[DEFAULT_MODEL];
-    return (
-        ((usage.input_tokens || 0) * price.input) +
-        ((usage.cache_creation_input_tokens || 0) * price.input * 1.25) +
-        ((usage.cache_read_input_tokens || 0) * price.input * 0.1) +
-        ((usage.output_tokens || 0) * price.output)
-    ) / 1e6;
-};
-
 const MAX_ITERATIONS = 30;
 const MAX_TOKENS = 16000;
 const REQUEST_TIMEOUT_MS = 180000; // 1回のAPI呼び出しの上限(ストリーミングなので通常は当たらない保険)
@@ -156,8 +134,7 @@ const runOpenAICompatAgent = async ({
     onAssistantText,
     onToolStart,
     onToolEnd,
-    onToolDrafting,
-    onUsage
+    onToolDrafting
 }) => {
     const model = modelOverride || getModel();
     const isOpenAI = isOpenAIModel(model);
@@ -190,7 +167,7 @@ const runOpenAICompatAgent = async ({
                 // GPT-5系は max_tokens 非対応(max_completion_tokens を使う)。
                 // ストリーミング時の usage 取得も OpenAI は明示オプトインが必要
                 ...(isOpenAI
-                    ? {max_completion_tokens: MAX_TOKENS, stream_options: {include_usage: true}}
+                    ? {max_completion_tokens: MAX_TOKENS}
                     : {max_tokens: MAX_TOKENS}),
                 messages: [...systemMessages, ...oaiMessages],
                 tools: oaiTools,
@@ -232,12 +209,6 @@ const runOpenAICompatAgent = async ({
                     onToolDrafting(null, 0);
                 }
 
-                if (chunk.usage && onUsage) {
-                    onUsage(estimateCost(model, {
-                        input_tokens: chunk.usage.prompt_tokens,
-                        output_tokens: chunk.usage.completion_tokens
-                    }));
-                }
             }
             toolCalls = Object.values(partialToolCalls);
         } catch (e) {
@@ -310,8 +281,7 @@ export const runAgent = async ({
     onAssistantText,
     onToolStart,
     onToolEnd,
-    onToolDrafting,
-    onUsage
+    onToolDrafting
 }) => {
     const model = getModel();
 
@@ -322,9 +292,10 @@ export const runAgent = async ({
             apiKey: getTrialToken(),
             baseURL: TRIAL_PROXY_URL,
             model: TRIAL_MODEL,
-            vm, userText, apiMessages, signal, blocksEnabled,
+            // お試しモードはブロック操作不可(説明・解説モード固定)
+            vm, userText, apiMessages, signal, blocksEnabled: false,
             onAssistantStart, onAssistantDelta, onAssistantText,
-            onToolStart, onToolEnd, onToolDrafting, onUsage
+            onToolStart, onToolEnd, onToolDrafting
         });
     }
 
@@ -335,7 +306,7 @@ export const runAgent = async ({
         return runOpenAICompatAgent({
             apiKey: deepseekApiKey, vm, userText, apiMessages, signal, blocksEnabled,
             onAssistantStart, onAssistantDelta, onAssistantText,
-            onToolStart, onToolEnd, onToolDrafting, onUsage
+            onToolStart, onToolEnd, onToolDrafting
         });
     }
 
@@ -348,7 +319,7 @@ export const runAgent = async ({
             baseURL: 'https://api.openai.com/v1',
             vm, userText, apiMessages, signal, blocksEnabled,
             onAssistantStart, onAssistantDelta, onAssistantText,
-            onToolStart, onToolEnd, onToolDrafting, onUsage
+            onToolStart, onToolEnd, onToolDrafting
         });
     }
 
@@ -447,9 +418,6 @@ export const runAgent = async ({
 
         apiMessages.push({role: 'assistant', content: response.content});
 
-        if (onUsage && response.usage) {
-            onUsage(estimateCost(effectiveModel, response.usage));
-        }
 
         if (response.stop_reason !== 'tool_use') {
             if (response.stop_reason === 'max_tokens') {

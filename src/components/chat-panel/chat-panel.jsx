@@ -3,6 +3,7 @@ import scratchblocks from 'scratchblocks';
 import jaLocale from 'scratchblocks/locales/ja.json';
 import jaHiraLocale from 'scratchblocks/locales/ja-Hira.json';
 import {BLOCK_LABELS, getBlockLabel, findOpcodeByJaName, isRedundantJaAnnotation} from '../../agent/block-labels.js';
+import {isDeepSeekModel, isOpenAIModel} from '../../agent/agent-loop';
 import './chat-panel.css';
 
 // 日本語ロケールを登録
@@ -252,7 +253,17 @@ const MessageRow = ({message}) => {
     );
 };
 
-const formatCost = cost => (cost >= 0.01 ? `$${cost.toFixed(2)}` : `$${cost.toFixed(4)}`);
+// モデルのプロバイダごとの料金ページ(コスト概算は誤差が大きいため、公式料金表へのリンクを示す)
+const PRICING_PAGES = {
+    anthropic: {label: 'Anthropic', url: 'https://docs.claude.com/en/docs/about-claude/pricing'},
+    deepseek: {label: 'DeepSeek', url: 'https://api-docs.deepseek.com/quick_start/pricing'},
+    openai: {label: 'OpenAI', url: 'https://platform.openai.com/docs/pricing'}
+};
+const pricingPageFor = model => {
+    if (isDeepSeekModel(model)) return PRICING_PAGES.deepseek;
+    if (isOpenAIModel(model)) return PRICING_PAGES.openai;
+    return PRICING_PAGES.anthropic;
+};
 
 // 応答待ちインジケータ(ツール入力の生成中はその進捗を表示)
 const ThinkingRow = ({drafting}) => (
@@ -267,7 +278,7 @@ const ThinkingRow = ({drafting}) => (
 );
 
 const SUGGESTIONS = [
-    {label: 'ネコ逃げを教えて', text: 'https://github.com/champierre/nekonige で紹介しているネコ逃げゲームの作り方を教えて', disableBlocks: true},
+    {label: 'ネコ逃げゲームを教えて', text: 'https://github.com/champierre/nekonige で紹介しているネコ逃げゲームの作り方を教えて', disableBlocks: true},
     {label: 'ネコを動かして', text: 'ネコが旗をクリックしたら右に動き続けるようにして'}
 ];
 
@@ -278,8 +289,6 @@ const ChatPanel = ({
     hasApiKey,
     trialMode,
     currentModel,
-    sessionCost,
-    totalCost,
     blocksEnabled,
     onSend,
     onStop,
@@ -361,10 +370,12 @@ const ChatPanel = ({
                 {showThinking && <ThinkingRow drafting={drafting} />}
             </div>
             <div className="as-chat-input-area">
-                {hasApiKey && (
-                    <div className="as-chat-cost" title="トークン使用量から計算した概算です">
-                        {currentModel && <span style={{marginRight: '6px', opacity: 0.7}}>[{currentModel}]</span>}
-                        コスト(概算): このセッション {formatCost(sessionCost)} / 累計 {formatCost(totalCost)}
+                {currentModel && (
+                    <div className="as-chat-cost">
+                        <span style={{marginRight: '6px', opacity: 0.7}}>[{currentModel}]</span>
+                        <a href={pricingPageFor(currentModel).url} target="_blank" rel="noreferrer">
+                            {pricingPageFor(currentModel).label} の料金表(API利用料)
+                        </a>
                     </div>
                 )}
                 {trialMode && (
@@ -377,11 +388,14 @@ const ChatPanel = ({
                         ⚙️ をクリックして API キーを設定してください
                     </div>
                 )}
-                <div className="as-chat-toggle-row">
+                <div
+                    className="as-chat-toggle-row"
+                    title={trialMode ? 'お試しモードではブロック操作は使えません。⚙️ から自分の API キーを設定すると使えます' : undefined}
+                >
                     <span className="as-chat-toggle-desc">ブロック操作</span>
                     <span
-                        className={`as-chat-toggle-switch${blocksEnabled ? ' as-chat-toggle-on' : ''}`}
-                        onClick={onToggleBlocks}
+                        className={`as-chat-toggle-switch${!trialMode && blocksEnabled ? ' as-chat-toggle-on' : ''}${trialMode ? ' as-chat-toggle-disabled' : ''}`}
+                        onClick={trialMode ? undefined : onToggleBlocks}
                     >
                         <span className="as-chat-toggle-knob" />
                     </span>
