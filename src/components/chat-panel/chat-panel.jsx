@@ -312,7 +312,7 @@ const ChatPanel = ({
                 )}
                 {!canSend && (
                     <div className="as-chat-no-key" onClick={onOpenSettings}>
-                        ⚙️ をクリックして Anthropic API キーを設定してください
+                        ⚙️ をクリックして API キーを設定してください
                     </div>
                 )}
                 <div className="as-chat-toggle-row">
