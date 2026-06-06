@@ -5,7 +5,6 @@ import DisclosureModal from '../components/disclosure-modal/disclosure-modal.jsx
 import {runAgent, AuthError, getModel, setModel, isTrialAvailable, getDeepSeekApiKey, setDeepSeekApiKey, isDeepSeekModel, getOpenAIApiKey, setOpenAIApiKey, isOpenAIModel, DEV_ANTHROPIC_KEY} from '../agent/agent-loop';
 
 const STORAGE_KEY = 'agent-scratch-api-key';
-const COST_STORAGE_KEY = 'agent-scratch-total-cost';
 const DISCLOSURE_STORAGE_KEY = 'agent-scratch-disclosure-accepted';
 
 const ChatPanel = ({vm}) => {
@@ -22,10 +21,6 @@ const ChatPanel = ({vm}) => {
     // ツール入力生成中の進捗表示("ブロックを書いています (1200文字)" など)
     const [drafting, setDrafting] = useState(null);
     const [currentModel, setCurrentModel] = useState(() => getModel());
-    const [sessionCost, setSessionCost] = useState(0);
-    const [totalCost, setTotalCost] = useState(
-        () => parseFloat(localStorage.getItem(COST_STORAGE_KEY)) || 0
-    );
 
     // Anthropic API 形式の会話履歴(マルチターン対応)
     const apiMessagesRef = useRef([]);
@@ -81,15 +76,6 @@ const ChatPanel = ({vm}) => {
         });
     }, []);
 
-    const handleUsage = useCallback(cost => {
-        setSessionCost(prev => prev + cost);
-        setTotalCost(prev => {
-            const next = prev + cost;
-            localStorage.setItem(COST_STORAGE_KEY, String(next));
-            return next;
-        });
-    }, []);
-
     const handleSend = useCallback(async text => {
         if (!vm) {
             appendMessage({role: 'error', text: 'Scratch エディタの読み込みが完了していません。'});
@@ -117,8 +103,7 @@ const ChatPanel = ({vm}) => {
                 onToolEnd: (ok, detail) => finishLastTool(ok, detail),
                 onToolDrafting: (label, chars) => {
                     setDrafting(label ? {label, chars} : null);
-                },
-                onUsage: handleUsage
+                }
             });
         } catch (e) {
             if (e instanceof AuthError) {
@@ -135,7 +120,7 @@ const ChatPanel = ({vm}) => {
             finishStreaming();
             abortRef.current = null;
         }
-    }, [vm, apiKey, appendMessage, finishLastTool, handleUsage, startAssistant, appendAssistantDelta, finishStreaming]);
+    }, [vm, apiKey, appendMessage, finishLastTool, startAssistant, appendAssistantDelta, finishStreaming]);
 
     const handleStop = useCallback(() => {
         if (abortRef.current) abortRef.current.abort();
@@ -156,6 +141,8 @@ const ChatPanel = ({vm}) => {
         setShowModal(false);
     }, []);
 
+    const trialModeNow = !apiKey && !deepseekApiKey && !openaiApiKey && isTrialAvailable();
+
     return (
         <>
             <ChatPanelComponent
@@ -166,11 +153,9 @@ const ChatPanel = ({vm}) => {
                     isDeepSeekModel(getModel()) ? !!deepseekApiKey :
                         isOpenAIModel(getModel()) ? !!openaiApiKey : !!apiKey
                 }
-                trialMode={!apiKey && !deepseekApiKey && !openaiApiKey && isTrialAvailable()}
+                trialMode={trialModeNow}
                 currentModel={currentModel}
-                sessionCost={sessionCost}
-                totalCost={totalCost}
-                blocksEnabled={blocksEnabled}
+                blocksEnabled={trialModeNow ? false : blocksEnabled}
                 onSend={handleSend}
                 onStop={handleStop}
                 onOpenSettings={() => setShowModal(true)}
