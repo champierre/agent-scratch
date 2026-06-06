@@ -7,7 +7,7 @@ import {runAgent, AuthError, getModel, setModel, isTrialAvailable, getDeepSeekAp
 const STORAGE_KEY = 'agent-scratch-api-key';
 const DISCLOSURE_STORAGE_KEY = 'agent-scratch-disclosure-accepted';
 
-const ChatPanel = ({vm}) => {
+const ChatPanel = ({vm, collapsed, onToggleCollapse}) => {
     const [messages, setMessages] = useState([]);
     const [running, setRunning] = useState(false);
     const [apiKey, setApiKey] = useState(() => localStorage.getItem(STORAGE_KEY) || DEV_ANTHROPIC_KEY || '');
@@ -146,6 +146,8 @@ const ChatPanel = ({vm}) => {
     return (
         <>
             <ChatPanelComponent
+                collapsed={collapsed}
+                onToggleCollapse={onToggleCollapse}
                 messages={messages}
                 running={running}
                 drafting={drafting}
