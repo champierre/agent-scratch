@@ -15,8 +15,20 @@ const SCRIPTS_SCHEMA = {
     }
 };
 
-// ブロック操作に関わるツール名の集合
-export const BLOCK_TOOL_NAMES = new Set(['set_scripts']);
+// blocksEnabled=false のとき除外するツール名の集合
+// (get_project_state / search_library / fetch_url は読み取り専用なので常に使用可)
+export const BLOCK_TOOL_NAMES = new Set([
+    'add_sprite',
+    'delete_sprite',
+    'rename_sprite',
+    'add_costume',
+    'add_sound',
+    'add_backdrop',
+    'set_scripts',
+    'set_sprite_properties',
+    'start_project',
+    'stop_project'
+]);
 
 export const TOOLS = [
     {
@@ -142,6 +154,17 @@ export const TOOLS = [
         name: 'stop_project',
         description: 'プロジェクトの実行を止める。',
         input_schema: {type: 'object', properties: {}}
+    },
+    {
+        name: 'fetch_url',
+        description: 'URLのページ内容(テキスト/HTML/Markdown)を取得する。GitHubのREADMEやWebページを参照して内容を説明するときに使う。',
+        input_schema: {
+            type: 'object',
+            properties: {
+                url: {type: 'string', description: '取得するURL(http/https)'}
+            },
+            required: ['url']
+        }
     }
 ];
 
@@ -152,6 +175,7 @@ export const draftingLabel = name => {
     case 'add_sprite': return 'スプライトを選んでいます';
     case 'search_library': return 'ライブラリを探しています';
     case 'set_sprite_properties': return 'スプライトを配置しています';
+    case 'fetch_url': return 'ページを取得しています';
     default: return '次の操作を準備しています';
     }
 };
@@ -171,6 +195,7 @@ export const summarizeToolCall = (name, input) => {
     case 'set_sprite_properties': return `プロパティ設定: ${input.target}`;
     case 'start_project': return 'プロジェクトを実行';
     case 'stop_project': return 'プロジェクトを停止';
+    case 'fetch_url': return `URLを取得: ${input.url}`;
     default: return name;
     }
 };
