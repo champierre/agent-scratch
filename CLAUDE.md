@@ -91,3 +91,9 @@ state を使うコールバックは依存配列に忘れずに追加する。`b
 ```
 
 Python の websocket-client でページ操作・スクリーンショット取得が可能。ただしヘッドレス Chrome は WebGL 非対応のため Scratch のステージ描画は崩れる。ブロック画像（scratchblocks SVG）の確認は可能。
+
+### 自動テスト（`npm test`）
+重いテストランナー（jest/vitest）は使わず、**esbuild でバンドル → node 実行**方式で統一している。
+
+- ロジック: `test/block-builder.test.js`, `test/block-labels.test.js`, `test/static-checks.js`
+- React コンポーネント: `test/chat-panel-ui.test.js` を `tools/run-ui-test.mjs` 経由で実行（jsdom + `@testing-library/react`）。`scratchblocks`(UMD)と CSS はテストに不要なのでランナー内の esbuild plugin / 空ローダーで stub する。UI 挙動（折りたたみ等）のリグレッションはここに追加する。
