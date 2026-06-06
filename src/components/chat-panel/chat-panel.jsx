@@ -204,6 +204,12 @@ const ThinkingRow = ({drafting}) => (
     </div>
 );
 
+const SUGGESTIONS = [
+    {label: 'ネコ逃げを教えて', text: 'https://github.com/champierre/nekonige で紹介しているネコ逃げゲームの作り方を教えて'},
+    {label: 'ネコを動かして', text: 'ネコが旗をクリックしたら右に動き続けるようにして'},
+    {label: 'ボール跳ね返りゲーム', text: 'ボールが跳ね返るゲームを作って'}
+];
+
 const ChatPanel = ({
     messages,
     running,
@@ -327,6 +333,18 @@ const ChatPanel = ({
                     onChange={e => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
                 />
+                {messages.length === 0 && !running && (
+                    <div className="as-chat-suggestions">
+                        {SUGGESTIONS.map(s => (
+                            <button
+                                key={s.label}
+                                className="as-chat-suggestion-badge"
+                                disabled={!canSend}
+                                onClick={() => { if (canSend) onSend(s.text); }}
+                            >{s.label}</button>
+                        ))}
+                    </div>
+                )}
                 {running ? (
                     <button className="as-chat-button as-chat-stop" onClick={onStop}>
                         ■ 停止

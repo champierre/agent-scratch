@@ -222,3 +222,26 @@
     background: #e25b4c;
     color: white;
 }
+
+.as-chat-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.as-chat-suggestion-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    background: #f0eafa;
+    border: 1px solid #c9b8f0;
+    border-radius: 12px;
+    color: #5c3fa3;
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s;
+}
+
+.as-chat-suggestion-badge:hover {
+    background: #e0d4f7;
+}
