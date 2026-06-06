@@ -7,10 +7,9 @@ import {
     searchBackdrops, findBackdropByName
 } from './library-search';
 
-// Worker プロキシのベース URL(TRIAL_PROXY_URL の末尾 /v1/chat/completions 等を除いたもの)
+// fetch_url ツール用のプロキシベース URL(試用モードと同じ Worker を兼用)
 const WORKER_BASE_URL = (() => {
     const raw = process.env.TRIAL_PROXY_URL || '';
-    // "https://xxx.workers.dev" 形式に正規化する
     return raw.replace(/\/(v1\/)?chat\/completions$/, '').replace(/\/$/, '');
 })();
 
