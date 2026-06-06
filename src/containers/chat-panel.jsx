@@ -25,8 +25,6 @@ const ChatPanel = ({vm}) => {
     // Anthropic API 形式の会話履歴(マルチターン対応)
     const apiMessagesRef = useRef([]);
     const abortRef = useRef(null);
-    // blocksEnabled の最新値を ref でも保持 — useCallback の依存配列遅延を回避するため
-    const blocksEnabledRef = useRef(blocksEnabled);
 
     const appendMessage = useCallback(m => {
         setMessages(prev => [...prev, m]);
@@ -76,11 +74,15 @@ const ChatPanel = ({vm}) => {
         });
     }, []);
 
-    const handleSend = useCallback(async text => {
+    const handleSend = useCallback(async (text, opts = {}) => {
         if (!vm) {
             appendMessage({role: 'error', text: 'Scratch エディタの読み込みが完了していません。'});
             return;
         }
+        // ブロック操作の有効/無効は state(単一の真実)を使う。
+        // サジェスト等で一時的に無効化したい場合は呼び出し時に明示指定する
+        // (state 更新は非同期なので、ここで引数として確実に受け取る)
+        const effectiveBlocksEnabled = opts.forceBlocksDisabled ? false : blocksEnabled;
         appendMessage({role: 'user', text});
         setRunning(true);
         const controller = new AbortController();
@@ -92,7 +94,7 @@ const ChatPanel = ({vm}) => {
                 userText: text,
                 apiMessages: apiMessagesRef.current,
                 signal: controller.signal,
-                blocksEnabled: blocksEnabledRef.current,
+                blocksEnabled: effectiveBlocksEnabled,
                 onAssistantStart: startAssistant,
                 onAssistantDelta: appendAssistantDelta,
                 onAssistantText: t => appendMessage({role: 'assistant', text: t}),
@@ -120,7 +122,7 @@ const ChatPanel = ({vm}) => {
             finishStreaming();
             abortRef.current = null;
         }
-    }, [vm, apiKey, appendMessage, finishLastTool, startAssistant, appendAssistantDelta, finishStreaming]);
+    }, [vm, apiKey, blocksEnabled, appendMessage, finishLastTool, startAssistant, appendAssistantDelta, finishStreaming]);
 
     const handleStop = useCallback(() => {
         if (abortRef.current) abortRef.current.abort();
@@ -159,8 +161,8 @@ const ChatPanel = ({vm}) => {
                 onSend={handleSend}
                 onStop={handleStop}
                 onOpenSettings={() => setShowModal(true)}
-                onToggleBlocks={() => setBlocksEnabled(v => { blocksEnabledRef.current = !v; return !v; })}
-                onSetBlocksEnabled={v => { blocksEnabledRef.current = v; setBlocksEnabled(v); }}
+                onToggleBlocks={() => setBlocksEnabled(v => !v)}
+                onSetBlocksEnabled={v => setBlocksEnabled(v)}
             />
             {showDisclosure && (
                 <DisclosureModal

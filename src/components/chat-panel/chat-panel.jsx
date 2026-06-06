@@ -418,10 +418,12 @@ const ChatPanel = ({
                                 disabled={!canSend}
                                 onClick={() => {
                                     if (!canSend) return;
-                                    if (s.disableBlocks && blocksEnabled && onSetBlocksEnabled) {
+                                    // UI表示を同期(state)しつつ、送信値は引数で確実に渡す
+                                    // (state更新は非同期なので onSend の引数で明示する)
+                                    if (s.disableBlocks && onSetBlocksEnabled) {
                                         onSetBlocksEnabled(false);
                                     }
-                                    onSend(s.text);
+                                    onSend(s.text, {forceBlocksDisabled: !!s.disableBlocks});
                                 }}
                             >{s.label}</button>
                         ))}
