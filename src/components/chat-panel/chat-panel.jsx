@@ -1,28 +1,58 @@
 import React, {useEffect, useRef, useState} from 'react';
 import scratchblocks from 'scratchblocks';
-import {BLOCK_LABELS} from '../../agent/block-labels.js';
+import jaLocale from 'scratchblocks/locales/ja.json';
+import jaHiraLocale from 'scratchblocks/locales/ja-Hira.json';
+import {BLOCK_LABELS, getBlockLabel} from '../../agent/block-labels.js';
 import './chat-panel.css';
 
+// 日本語ロケールを登録
+scratchblocks.loadLanguages({'ja': jaLocale, 'ja-Hira': jaHiraLocale});
+
+// ブラウザの言語設定からscratchblocksに渡すlanguagesを決定
+const getSbLanguages = () => {
+    const lang = (navigator.language || 'en').toLowerCase();
+    if (lang.startsWith('ja')) return ['ja', 'en'];
+    return ['en'];
+};
+
 // opcode を scratchblocks SVG に変換するコンポーネント
-const OPCODE_RE = /\b([a-z]+_[a-zA-Z]+)\b/g;
+//
+// 検出パターンは「登録済み opcode(BLOCK_LABELS のキー)の完全一致リスト」から
+// 自動生成する。汎用の識別子パターン推測ではないため、登録済み opcode の
+// 取りこぼし(数字入り・複数アンダースコア等)が構造的に起きず、
+// opcode を追加すれば自動で検出対象になる。
+// 長いキー優先で並べ、前後が単語文字でないことを lookaround で保証する
+// (例: control_if_else の中の control_if に誤マッチしない)。
+const OPCODE_RE = new RegExp(
+    `(?<![A-Za-z0-9_])(${
+        Object.keys(BLOCK_LABELS)
+            .sort((a, b) => b.length - a.length)
+            .join('|')
+    })(?![A-Za-z0-9_])`,
+    'g'
+);
+const SB_LANGUAGES = getSbLanguages();
 
 const BlockImage = ({opcode, keyStr}) => {
     const ref = useRef(null);
-    const label = BLOCK_LABELS[opcode];
-    if (!label) return <code key={keyStr}>{opcode}</code>;
+    const lang = navigator.language || 'en';
+    const label = getBlockLabel(opcode, lang);
 
     useEffect(() => {
-        if (!ref.current) return;
+        if (!ref.current || !label) return;
         ref.current.innerHTML = '';
-        const doc = scratchblocks.parse(label, {languages: ['en']});
-        const svg = scratchblocks.render(doc, {style: 'scratch3', scale: 0.75});
+        const doc = scratchblocks.parse(label, {inline: true, languages: SB_LANGUAGES});
+        const svg = scratchblocks.render(doc, {style: 'scratch3', scale: 0.65});
         ref.current.appendChild(svg);
     }, [label]);
+
+    // フック呼び出しの後で early return する(Reactのフック順序を守る)
+    if (!label) return <code key={keyStr}>{opcode}</code>;
 
     return (
         <span
             ref={ref}
-            style={{display: 'inline-block', verticalAlign: 'middle', margin: '0 2px'}}
+            style={{display: 'inline-block', verticalAlign: 'middle', margin: '0 1px'}}
             title={opcode}
         />
     );
