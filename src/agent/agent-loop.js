@@ -122,12 +122,28 @@ const anthropicToOpenAIMessages = messages => {
     return result;
 };
 
+// OpenAI SDK が自動付与する x-stainless-* ヘッダの除去指定。
+// Google の OpenAI 互換エンドポイントはこれらを CORS で許可しておらず、
+// 付いているとプリフライトが 403 になり "Connection error." で失敗する
+const STRIP_STAINLESS_HEADERS = {
+    'x-stainless-arch': null,
+    'x-stainless-lang': null,
+    'x-stainless-os': null,
+    'x-stainless-package-version': null,
+    'x-stainless-retry-count': null,
+    'x-stainless-runtime': null,
+    'x-stainless-runtime-version': null,
+    'x-stainless-timeout': null,
+    'x-stainless-helper-method': null
+};
+
 /**
- * OpenAI互換 (DeepSeek / OpenAI 共用) エージェントループ
+ * OpenAI互換 (DeepSeek / OpenAI / Gemini 共用) エージェントループ
  */
 const runOpenAICompatAgent = async ({
     apiKey: compatApiKey,
     baseURL,
+    stripSdkHeaders,
     model: modelOverride,
     vm,
     userText,
@@ -148,7 +164,8 @@ const runOpenAICompatAgent = async ({
         baseURL: baseURL || 'https://api.deepseek.com',
         dangerouslyAllowBrowser: true,
         timeout: REQUEST_TIMEOUT_MS,
-        maxRetries: 1
+        maxRetries: 1,
+        ...(stripSdkHeaders ? {defaultHeaders: STRIP_STAINLESS_HEADERS} : {})
     });
     const handlers = createToolHandlers(vm, {blocksEnabled});
     const activeTools = blocksEnabled ? TOOLS : TOOLS.filter(t => !BLOCK_TOOL_NAMES.has(t.name));
@@ -335,6 +352,7 @@ export const runAgent = async ({
         return runOpenAICompatAgent({
             apiKey: geminiApiKey,
             baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai',
+            stripSdkHeaders: true,
             vm, userText, apiMessages, signal, blocksEnabled,
             onAssistantStart, onAssistantDelta, onAssistantText,
             onToolStart, onToolEnd, onToolDrafting
