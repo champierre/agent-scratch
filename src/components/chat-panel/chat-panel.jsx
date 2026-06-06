@@ -96,49 +96,68 @@ const renderInline = (text, keyPrefix) => {
     return parts;
 };
 
-// 行単位のブロック要素(見出し・リスト・区切り線)も処理するマークダウン描画
+// 行単位のブロック要素(見出し・リスト・区切り線・コードブロック)も処理するマークダウン描画
 const renderMarkdownLite = text => {
-    const lines = text.split('\n');
+    // コードブロック(```...```)を先に分割し、その中はプレーンテキストとして扱う
+    const segments = text.split(/(```[\s\S]*?```)/g);
     const result = [];
-    let listItems = [];
 
-    const flushList = () => {
-        if (listItems.length > 0) {
-            result.push(<ul key={`ul-${result.length}`} style={{margin: '4px 0', paddingLeft: '18px'}}>{listItems}</ul>);
-            listItems = [];
+    segments.forEach((seg, segIdx) => {
+        if (/^```[\s\S]*```$/.test(seg)) {
+            // フェンスと言語指定行を除いた中身をそのまま表示
+            const inner = seg.replace(/^```[^\n]*\n?/, '').replace(/```$/, '');
+            result.push(
+                <pre key={`pre-${segIdx}`} style={{
+                    background: '#f5f5f5', borderRadius: '4px', padding: '6px 8px',
+                    fontSize: '11px', overflowX: 'auto', margin: '4px 0', whiteSpace: 'pre-wrap'
+                }}>{inner}</pre>
+            );
+            return;
         }
-    };
 
-    lines.forEach((line, i) => {
-        const h2 = line.match(/^##\s+(.+)/);
-        const h3 = line.match(/^###\s+(.+)/);
-        const li = line.match(/^[-*]\s+(.+)/);
-        const ol = line.match(/^\d+\.\s+(.+)/);
-        const hr = /^---+$/.test(line.trim());
+        const lines = seg.split('\n');
+        let listItems = [];
 
-        if (h2) {
-            flushList();
-            result.push(<strong key={i} style={{display: 'block', fontSize: '14px', marginTop: '6px'}}>{renderInline(h2[1], i)}</strong>);
-        } else if (h3) {
-            flushList();
-            result.push(<strong key={i} style={{display: 'block', marginTop: '4px'}}>{renderInline(h3[1], i)}</strong>);
-        } else if (li) {
-            listItems.push(<li key={i}>{renderInline(li[1], i)}</li>);
-        } else if (ol) {
-            listItems.push(<li key={i}>{renderInline(ol[1], i)}</li>);
-        } else if (hr) {
-            flushList();
-            result.push(<hr key={i} style={{border: 'none', borderTop: '1px solid #ddd', margin: '6px 0'}} />);
-        } else {
-            flushList();
-            if (line === '') {
-                result.push(<br key={i} />);
-            } else {
-                result.push(<span key={i} style={{display: 'block'}}>{renderInline(line, i)}</span>);
+        const flushList = () => {
+            if (listItems.length > 0) {
+                result.push(<ul key={`ul-${result.length}`} style={{margin: '4px 0', paddingLeft: '18px'}}>{listItems}</ul>);
+                listItems = [];
             }
-        }
+        };
+
+        lines.forEach((line, i) => {
+            const key = `${segIdx}-${i}`;
+            const h2 = line.match(/^##\s+(.+)/);
+            const h3 = line.match(/^###\s+(.+)/);
+            const li = line.match(/^[-*]\s+(.+)/);
+            const ol = line.match(/^\d+\.\s+(.+)/);
+            const hr = /^---+$/.test(line.trim());
+
+            if (h2) {
+                flushList();
+                result.push(<strong key={key} style={{display: 'block', fontSize: '14px', marginTop: '6px'}}>{renderInline(h2[1], key)}</strong>);
+            } else if (h3) {
+                flushList();
+                result.push(<strong key={key} style={{display: 'block', marginTop: '4px'}}>{renderInline(h3[1], key)}</strong>);
+            } else if (li) {
+                listItems.push(<li key={key}>{renderInline(li[1], key)}</li>);
+            } else if (ol) {
+                listItems.push(<li key={key}>{renderInline(ol[1], key)}</li>);
+            } else if (hr) {
+                flushList();
+                result.push(<hr key={key} style={{border: 'none', borderTop: '1px solid #ddd', margin: '6px 0'}} />);
+            } else {
+                flushList();
+                if (line === '') {
+                    result.push(<br key={key} />);
+                } else {
+                    result.push(<span key={key} style={{display: 'block'}}>{renderInline(line, key)}</span>);
+                }
+            }
+        });
+        flushList();
     });
-    flushList();
+
     return result;
 };
 
@@ -191,6 +210,7 @@ const ChatPanel = ({
     drafting,
     hasApiKey,
     trialMode,
+    currentModel,
     sessionCost,
     totalCost,
     blocksEnabled,
@@ -275,6 +295,7 @@ const ChatPanel = ({
             <div className="as-chat-input-area">
                 {hasApiKey && (
                     <div className="as-chat-cost" title="トークン使用量から計算した概算です">
+                        {currentModel && <span style={{marginRight: '6px', opacity: 0.7}}>[{currentModel}]</span>}
                         コスト(概算): このセッション {formatCost(sessionCost)} / 累計 {formatCost(totalCost)}
                     </div>
                 )}

@@ -13,13 +13,23 @@ export const isTrialAvailable = () => Boolean(TRIAL_PROXY_URL);
 
 const MODEL_STORAGE_KEY = 'agent-scratch-model';
 const DEEPSEEK_API_KEY_STORAGE_KEY = 'agent-scratch-deepseek-api-key';
+const OPENAI_API_KEY_STORAGE_KEY = 'agent-scratch-openai-api-key';
+
+// ローカル開発用キー(.env から webpack DefinePlugin で注入。未設定なら空文字)
+export const DEV_ANTHROPIC_KEY = process.env.DEV_ANTHROPIC_API_KEY || '';
+const DEV_DEEPSEEK_KEY = process.env.DEV_DEEPSEEK_API_KEY || '';
+const DEV_OPENAI_KEY = process.env.DEV_OPENAI_API_KEY || '';
+
 export const DEFAULT_MODEL = 'deepseek-chat'; // デフォルトモデル
 export const TRIAL_MODEL = 'deepseek-chat';   // お試しモードで使うモデル
 export const getModel = () => localStorage.getItem(MODEL_STORAGE_KEY) || DEFAULT_MODEL;
 export const setModel = model => localStorage.setItem(MODEL_STORAGE_KEY, model);
-export const getDeepSeekApiKey = () => localStorage.getItem(DEEPSEEK_API_KEY_STORAGE_KEY) || '';
+export const getDeepSeekApiKey = () => localStorage.getItem(DEEPSEEK_API_KEY_STORAGE_KEY) || DEV_DEEPSEEK_KEY;
 export const setDeepSeekApiKey = key => localStorage.setItem(DEEPSEEK_API_KEY_STORAGE_KEY, key);
 export const isDeepSeekModel = model => model && model.startsWith('deepseek-');
+export const getOpenAIApiKey = () => localStorage.getItem(OPENAI_API_KEY_STORAGE_KEY) || DEV_OPENAI_KEY;
+export const setOpenAIApiKey = key => localStorage.setItem(OPENAI_API_KEY_STORAGE_KEY, key);
+export const isOpenAIModel = model => model && model.startsWith('gpt-');
 
 // 100万トークンあたりのUSD単価(概算用)。キャッシュ書込は入力の1.25倍、読出は0.1倍
 const PRICING = {
@@ -27,7 +37,10 @@ const PRICING = {
     'claude-sonnet-4-6': {input: 3, output: 15},
     'claude-haiku-4-5-20251001': {input: 1, output: 5},
     'deepseek-chat': {input: 0.27, output: 1.1},
-    'deepseek-reasoner': {input: 0.55, output: 2.19}
+    'deepseek-reasoner': {input: 0.55, output: 2.19},
+    'gpt-5.1': {input: 1.25, output: 10},
+    'gpt-5-mini': {input: 0.25, output: 2},
+    'gpt-5-nano': {input: 0.05, output: 0.4}
 };
 
 export const estimateCost = (model, usage) => {
@@ -108,10 +121,10 @@ const anthropicToOpenAIMessages = messages => {
 };
 
 /**
- * DeepSeek (OpenAI互換) エージェントループ
+ * OpenAI互換 (DeepSeek / OpenAI 共用) エージェントループ
  */
-const runDeepSeekAgent = async ({
-    deepseekApiKey,
+const runOpenAICompatAgent = async ({
+    apiKey: compatApiKey,
     baseURL,
     model: modelOverride,
     vm,
@@ -128,8 +141,9 @@ const runDeepSeekAgent = async ({
     onUsage
 }) => {
     const model = modelOverride || getModel();
+    const isOpenAI = isOpenAIModel(model);
     const client = new OpenAI({
-        apiKey: deepseekApiKey,
+        apiKey: compatApiKey,
         baseURL: baseURL || 'https://api.deepseek.com',
         dangerouslyAllowBrowser: true,
         timeout: REQUEST_TIMEOUT_MS,
@@ -154,7 +168,11 @@ const runDeepSeekAgent = async ({
             if (onAssistantStart) onAssistantStart();
             const stream = await client.chat.completions.create({
                 model,
-                max_tokens: MAX_TOKENS,
+                // GPT-5系は max_tokens 非対応(max_completion_tokens を使う)。
+                // ストリーミング時の usage 取得も OpenAI は明示オプトインが必要
+                ...(isOpenAI
+                    ? {max_completion_tokens: MAX_TOKENS, stream_options: {include_usage: true}}
+                    : {max_tokens: MAX_TOKENS}),
                 messages: [...systemMessages, ...oaiMessages],
                 tools: oaiTools,
                 tool_choice: 'auto',
@@ -279,10 +297,10 @@ export const runAgent = async ({
     const model = getModel();
 
     // お試しモード: キー未入力 + プロキシURL設定済み → DeepSeek プロキシ経由
-    const useTrial = !apiKey && !getDeepSeekApiKey() && isTrialAvailable();
+    const useTrial = !apiKey && !getDeepSeekApiKey() && !getOpenAIApiKey() && isTrialAvailable();
     if (useTrial) {
-        return runDeepSeekAgent({
-            deepseekApiKey: 'trial-mode',
+        return runOpenAICompatAgent({
+            apiKey: 'trial-mode',
             baseURL: TRIAL_PROXY_URL,
             model: TRIAL_MODEL,
             vm, userText, apiMessages, signal, blocksEnabled,
@@ -291,12 +309,25 @@ export const runAgent = async ({
         });
     }
 
-    // DeepSeekモデルが選択されている場合は専用ループへ
+    // DeepSeekモデルが選択されている場合はOpenAI互換ループへ
     if (isDeepSeekModel(model)) {
         const deepseekApiKey = getDeepSeekApiKey();
         if (!deepseekApiKey) throw new AuthError('DeepSeek APIキーが設定されていません。⚙️ から設定してください。');
-        return runDeepSeekAgent({
-            deepseekApiKey, vm, userText, apiMessages, signal, blocksEnabled,
+        return runOpenAICompatAgent({
+            apiKey: deepseekApiKey, vm, userText, apiMessages, signal, blocksEnabled,
+            onAssistantStart, onAssistantDelta, onAssistantText,
+            onToolStart, onToolEnd, onToolDrafting, onUsage
+        });
+    }
+
+    // OpenAI (GPT) モデルが選択されている場合もOpenAI互換ループへ
+    if (isOpenAIModel(model)) {
+        const openaiApiKey = getOpenAIApiKey();
+        if (!openaiApiKey) throw new AuthError('OpenAI APIキーが設定されていません。⚙️ から設定してください。');
+        return runOpenAICompatAgent({
+            apiKey: openaiApiKey,
+            baseURL: 'https://api.openai.com/v1',
+            vm, userText, apiMessages, signal, blocksEnabled,
             onAssistantStart, onAssistantDelta, onAssistantText,
             onToolStart, onToolEnd, onToolDrafting, onUsage
         });

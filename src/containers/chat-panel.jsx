@@ -2,7 +2,7 @@ import React, {useCallback, useRef, useState} from 'react';
 import ChatPanelComponent from '../components/chat-panel/chat-panel.jsx';
 import ApiKeyModal from '../components/api-key-modal/api-key-modal.jsx';
 import DisclosureModal from '../components/disclosure-modal/disclosure-modal.jsx';
-import {runAgent, AuthError, getModel, setModel, isTrialAvailable, getDeepSeekApiKey, setDeepSeekApiKey, isDeepSeekModel, DEV_ANTHROPIC_KEY} from '../agent/agent-loop';
+import {runAgent, AuthError, getModel, setModel, isTrialAvailable, getDeepSeekApiKey, setDeepSeekApiKey, isDeepSeekModel, getOpenAIApiKey, setOpenAIApiKey, isOpenAIModel, DEV_ANTHROPIC_KEY} from '../agent/agent-loop';
 
 const STORAGE_KEY = 'agent-scratch-api-key';
 const COST_STORAGE_KEY = 'agent-scratch-total-cost';
@@ -13,6 +13,7 @@ const ChatPanel = ({vm}) => {
     const [running, setRunning] = useState(false);
     const [apiKey, setApiKey] = useState(() => localStorage.getItem(STORAGE_KEY) || DEV_ANTHROPIC_KEY || '');
     const [deepseekApiKey, setDeepseekApiKeyState] = useState(() => getDeepSeekApiKey());
+    const [openaiApiKey, setOpenaiApiKeyState] = useState(() => getOpenAIApiKey());
     const [blocksEnabled, setBlocksEnabled] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [showDisclosure, setShowDisclosure] = useState(
@@ -20,6 +21,7 @@ const ChatPanel = ({vm}) => {
     );
     // ツール入力生成中の進捗表示("ブロックを書いています (1200文字)" など)
     const [drafting, setDrafting] = useState(null);
+    const [currentModel, setCurrentModel] = useState(() => getModel());
     const [sessionCost, setSessionCost] = useState(0);
     const [totalCost, setTotalCost] = useState(
         () => parseFloat(localStorage.getItem(COST_STORAGE_KEY)) || 0
@@ -133,13 +135,17 @@ const ChatPanel = ({vm}) => {
         if (abortRef.current) abortRef.current.abort();
     }, []);
 
-    const handleSaveApiKey = useCallback((key, model, dsKey) => {
+    const handleSaveApiKey = useCallback((key, model, dsKey, oaKey) => {
         localStorage.setItem(STORAGE_KEY, key);
         setApiKey(key);
-        if (model) setModel(model);
+        if (model) { setModel(model); setCurrentModel(model); }
         if (dsKey !== undefined) {
             setDeepSeekApiKey(dsKey);
             setDeepseekApiKeyState(dsKey);
+        }
+        if (oaKey !== undefined) {
+            setOpenAIApiKey(oaKey);
+            setOpenaiApiKeyState(oaKey);
         }
         setShowModal(false);
     }, []);
@@ -150,8 +156,12 @@ const ChatPanel = ({vm}) => {
                 messages={messages}
                 running={running}
                 drafting={drafting}
-                hasApiKey={isDeepSeekModel(getModel()) ? !!deepseekApiKey : !!apiKey}
-                trialMode={!apiKey && !deepseekApiKey && isTrialAvailable()}
+                hasApiKey={
+                    isDeepSeekModel(getModel()) ? !!deepseekApiKey :
+                        isOpenAIModel(getModel()) ? !!openaiApiKey : !!apiKey
+                }
+                trialMode={!apiKey && !deepseekApiKey && !openaiApiKey && isTrialAvailable()}
+                currentModel={currentModel}
                 sessionCost={sessionCost}
                 totalCost={totalCost}
                 blocksEnabled={blocksEnabled}
@@ -172,6 +182,7 @@ const ChatPanel = ({vm}) => {
                 <ApiKeyModal
                     initialApiKey={apiKey}
                     initialDeepSeekApiKey={deepseekApiKey}
+                    initialOpenAIApiKey={openaiApiKey}
                     initialModel={getModel()}
                     onSave={handleSaveApiKey}
                     onClose={() => setShowModal(false)}

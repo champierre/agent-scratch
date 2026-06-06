@@ -5,7 +5,7 @@
 Scratch エディタに組み込まれた AI エージェント。ユーザーの自然言語指示から Scratch プロジェクトを自動生成する。
 
 - **フロントエンド**: React + webpack、Scratch GUI を組み込み
-- **AI**: Anthropic Claude API / DeepSeek API（OpenAI 互換）
+- **AI**: Anthropic Claude API / DeepSeek API / OpenAI API（後二者は OpenAI 互換ループを共用）
 - **試用モード**: Cloudflare Worker プロキシ経由（DeepSeek deepseek-chat）
 - **デプロイ**: GitHub Pages（`npm run build` → `build/` ディレクトリ）
 
@@ -17,7 +17,7 @@ npm install
 npm start              # http://localhost:8602/
 ```
 
-`.env` に `DEV_DEEPSEEK_API_KEY` または `DEV_ANTHROPIC_API_KEY` を設定するとブラウザへの手動入力が不要になる。本番ビルドにはキーは含まれない。
+`.env` に `DEV_DEEPSEEK_API_KEY`・`DEV_ANTHROPIC_API_KEY`・`DEV_OPENAI_API_KEY` を設定するとブラウザへの手動入力が不要になる。本番ビルドにはキーは含まれない。
 
 ## ブランチ・PRルール
 
@@ -30,8 +30,9 @@ npm start              # http://localhost:8602/
 
 ### エージェントループ (`src/agent/agent-loop.js`)
 
-- Anthropic と DeepSeek で別のループ実装（`runDeepSeekAgent` / Anthropic ループ）
-- 会話履歴は **Anthropic 形式** で統一管理し、DeepSeek に渡す際に OpenAI 形式に変換
+- Anthropic ループと OpenAI 互換ループ（`runOpenAICompatAgent`）の2実装。DeepSeek と OpenAI(GPT) は互換ループを共用
+- 会話履歴は **Anthropic 形式** で統一管理し、OpenAI 互換 API に渡す際に変換
+- GPT-5系は `max_tokens` 非対応のため `max_completion_tokens` を使用。ストリーミングの usage 取得は `stream_options: {include_usage: true}` でオプトイン
 - `blocksEnabled=false` のとき:
   1. ツールリストから `set_scripts` を除外
   2. システムプロンプトにブロック操作禁止の制約を追加
