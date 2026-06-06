@@ -5,7 +5,7 @@
   "scripts": {
     "start": "webpack serve --mode development",
     "build": "webpack --mode production",
-    "test": "node test/static-checks.js && esbuild test/block-builder.test.js --bundle --platform=node --format=cjs --outfile=.tmp-test.cjs --log-level=error && node .tmp-test.cjs && rm .tmp-test.cjs"
+    "test": "node test/static-checks.js && esbuild test/block-builder.test.js --bundle --platform=node --format=cjs --outfile=.tmp-test.cjs --log-level=error && node .tmp-test.cjs && rm .tmp-test.cjs && esbuild test/block-labels.test.js --bundle --platform=node --format=cjs --outfile=.tmp-test2.cjs --log-level=error && node .tmp-test2.cjs && rm .tmp-test2.cjs"
   },
   "license": "AGPL-3.0-only",
   "dependencies": {

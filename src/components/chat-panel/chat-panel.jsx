@@ -2,7 +2,7 @@ import React, {useEffect, useRef, useState} from 'react';
 import scratchblocks from 'scratchblocks';
 import jaLocale from 'scratchblocks/locales/ja.json';
 import jaHiraLocale from 'scratchblocks/locales/ja-Hira.json';
-import {BLOCK_LABELS, getBlockLabel} from '../../agent/block-labels.js';
+import {BLOCK_LABELS, getBlockLabel, findOpcodeByJaName} from '../../agent/block-labels.js';
 import './chat-panel.css';
 
 // 日本語ロケールを登録
@@ -59,6 +59,26 @@ const BlockImage = ({opcode, keyStr}) => {
 };
 
 // テキスト中の opcode を BlockImage に変換
+// 「ずっと」「10歩動かす」のようにカギ括弧で書かれた日本語ブロック名を
+// ブロック画像に変換する(opcodeで書かないモデルへのロジック側の救済)
+const JA_QUOTED_RE = /「([^「」]{2,40})」/g;
+
+const renderJaQuotedBlocks = (text, keyPrefix) => {
+    const parts = [];
+    let last = 0;
+    let match;
+    JA_QUOTED_RE.lastIndex = 0;
+    while ((match = JA_QUOTED_RE.exec(text)) !== null) {
+        const opcode = findOpcodeByJaName(match[1]);
+        if (!opcode) continue;
+        if (match.index > last) parts.push(text.slice(last, match.index));
+        parts.push(<BlockImage key={`${keyPrefix}-ja-${match.index}`} opcode={opcode} keyStr={`${keyPrefix}-ja-${match.index}`} />);
+        last = match.index + match[0].length;
+    }
+    if (last < text.length) parts.push(text.slice(last));
+    return parts.length > 0 ? parts : [text];
+};
+
 const renderWithBlocks = (text, keyPrefix) => {
     const parts = [];
     let last = 0;
@@ -67,11 +87,11 @@ const renderWithBlocks = (text, keyPrefix) => {
     while ((match = OPCODE_RE.exec(text)) !== null) {
         const opcode = match[1];
         if (!BLOCK_LABELS[opcode]) continue;
-        if (match.index > last) parts.push(text.slice(last, match.index));
+        if (match.index > last) parts.push(...renderJaQuotedBlocks(text.slice(last, match.index), `${keyPrefix}-${last}`));
         parts.push(<BlockImage key={`${keyPrefix}-blk-${match.index}`} opcode={opcode} keyStr={`${keyPrefix}-${match.index}`} />);
         last = match.index + match[0].length;
     }
-    if (last < text.length) parts.push(text.slice(last));
+    if (last < text.length) parts.push(...renderJaQuotedBlocks(text.slice(last), `${keyPrefix}-${last}`));
     return parts.length > 0 ? parts : [text];
 };
 
