@@ -329,7 +329,9 @@ const ChatPanel = ({
         historyIndex.current = -1;
         savedInput.current = '';
         setInput('');
-        onSend(text);
+        // 送信した画面に表示されている値を明示的に渡し、親側の
+        // useCallback が古い state を閉じ込めていても状態がずれないようにする。
+        onSend(text, {blocksEnabled});
     };
 
     const handleKeyDown = e => {
