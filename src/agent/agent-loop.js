@@ -33,11 +33,13 @@ export const isTrialAvailable = () => Boolean(TRIAL_PROXY_URL && getTrialToken()
 const MODEL_STORAGE_KEY = 'agent-scratch-model';
 const DEEPSEEK_API_KEY_STORAGE_KEY = 'agent-scratch-deepseek-api-key';
 const OPENAI_API_KEY_STORAGE_KEY = 'agent-scratch-openai-api-key';
+const GEMINI_API_KEY_STORAGE_KEY = 'agent-scratch-gemini-api-key';
 
 // ローカル開発用キー(.env から webpack DefinePlugin で注入。未設定なら空文字)
 export const DEV_ANTHROPIC_KEY = process.env.DEV_ANTHROPIC_API_KEY || '';
 const DEV_DEEPSEEK_KEY = process.env.DEV_DEEPSEEK_API_KEY || '';
 const DEV_OPENAI_KEY = process.env.DEV_OPENAI_API_KEY || '';
+const DEV_GEMINI_KEY = process.env.DEV_GEMINI_API_KEY || '';
 
 export const DEFAULT_MODEL = 'deepseek-chat'; // デフォルトモデル
 export const TRIAL_MODEL = 'deepseek-chat';   // お試しモードで使うモデル
@@ -49,6 +51,9 @@ export const isDeepSeekModel = model => model && model.startsWith('deepseek-');
 export const getOpenAIApiKey = () => localStorage.getItem(OPENAI_API_KEY_STORAGE_KEY) || DEV_OPENAI_KEY;
 export const setOpenAIApiKey = key => localStorage.setItem(OPENAI_API_KEY_STORAGE_KEY, key);
 export const isOpenAIModel = model => model && model.startsWith('gpt-');
+export const getGeminiApiKey = () => localStorage.getItem(GEMINI_API_KEY_STORAGE_KEY) || DEV_GEMINI_KEY;
+export const setGeminiApiKey = key => localStorage.setItem(GEMINI_API_KEY_STORAGE_KEY, key);
+export const isGeminiModel = model => model && model.startsWith('gemini-');
 
 const MAX_ITERATIONS = 30;
 const MAX_TOKENS = 16000;
@@ -286,7 +291,7 @@ export const runAgent = async ({
     const model = getModel();
 
     // お試しモード: キー未入力 + プロキシURL設定済み + トークン保存済み → DeepSeek プロキシ経由
-    const useTrial = !apiKey && !getDeepSeekApiKey() && !getOpenAIApiKey() && isTrialAvailable();
+    const useTrial = !apiKey && !getDeepSeekApiKey() && !getOpenAIApiKey() && !getGeminiApiKey() && isTrialAvailable();
     if (useTrial) {
         return runOpenAICompatAgent({
             apiKey: getTrialToken(),
@@ -317,6 +322,19 @@ export const runAgent = async ({
         return runOpenAICompatAgent({
             apiKey: openaiApiKey,
             baseURL: 'https://api.openai.com/v1',
+            vm, userText, apiMessages, signal, blocksEnabled,
+            onAssistantStart, onAssistantDelta, onAssistantText,
+            onToolStart, onToolEnd, onToolDrafting
+        });
+    }
+
+    // Google Gemini モデルもOpenAI互換エンドポイント経由で同じループへ
+    if (isGeminiModel(model)) {
+        const geminiApiKey = getGeminiApiKey();
+        if (!geminiApiKey) throw new AuthError('Gemini APIキーが設定されていません。⚙️ から設定してください。');
+        return runOpenAICompatAgent({
+            apiKey: geminiApiKey,
+            baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai',
             vm, userText, apiMessages, signal, blocksEnabled,
             onAssistantStart, onAssistantDelta, onAssistantText,
             onToolStart, onToolEnd, onToolDrafting

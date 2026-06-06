@@ -2,7 +2,7 @@ import React, {useCallback, useRef, useState} from 'react';
 import ChatPanelComponent from '../components/chat-panel/chat-panel.jsx';
 import ApiKeyModal from '../components/api-key-modal/api-key-modal.jsx';
 import DisclosureModal from '../components/disclosure-modal/disclosure-modal.jsx';
-import {runAgent, AuthError, getModel, setModel, isTrialAvailable, getDeepSeekApiKey, setDeepSeekApiKey, isDeepSeekModel, getOpenAIApiKey, setOpenAIApiKey, isOpenAIModel, DEV_ANTHROPIC_KEY} from '../agent/agent-loop';
+import {runAgent, AuthError, getModel, setModel, isTrialAvailable, getDeepSeekApiKey, setDeepSeekApiKey, isDeepSeekModel, getOpenAIApiKey, setOpenAIApiKey, isOpenAIModel, getGeminiApiKey, setGeminiApiKey, isGeminiModel, DEV_ANTHROPIC_KEY} from '../agent/agent-loop';
 
 const STORAGE_KEY = 'agent-scratch-api-key';
 const DISCLOSURE_STORAGE_KEY = 'agent-scratch-disclosure-accepted';
@@ -13,6 +13,7 @@ const ChatPanel = ({vm}) => {
     const [apiKey, setApiKey] = useState(() => localStorage.getItem(STORAGE_KEY) || DEV_ANTHROPIC_KEY || '');
     const [deepseekApiKey, setDeepseekApiKeyState] = useState(() => getDeepSeekApiKey());
     const [openaiApiKey, setOpenaiApiKeyState] = useState(() => getOpenAIApiKey());
+    const [geminiApiKey, setGeminiApiKeyState] = useState(() => getGeminiApiKey());
     const [blocksEnabled, setBlocksEnabled] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [showDisclosure, setShowDisclosure] = useState(
@@ -126,7 +127,7 @@ const ChatPanel = ({vm}) => {
         if (abortRef.current) abortRef.current.abort();
     }, []);
 
-    const handleSaveApiKey = useCallback((key, model, dsKey, oaKey) => {
+    const handleSaveApiKey = useCallback((key, model, dsKey, oaKey, gemKey) => {
         localStorage.setItem(STORAGE_KEY, key);
         setApiKey(key);
         if (model) { setModel(model); setCurrentModel(model); }
@@ -138,10 +139,14 @@ const ChatPanel = ({vm}) => {
             setOpenAIApiKey(oaKey);
             setOpenaiApiKeyState(oaKey);
         }
+        if (gemKey !== undefined) {
+            setGeminiApiKey(gemKey);
+            setGeminiApiKeyState(gemKey);
+        }
         setShowModal(false);
     }, []);
 
-    const trialModeNow = !apiKey && !deepseekApiKey && !openaiApiKey && isTrialAvailable();
+    const trialModeNow = !apiKey && !deepseekApiKey && !openaiApiKey && !geminiApiKey && isTrialAvailable();
 
     return (
         <>
@@ -151,7 +156,8 @@ const ChatPanel = ({vm}) => {
                 drafting={drafting}
                 hasApiKey={
                     isDeepSeekModel(getModel()) ? !!deepseekApiKey :
-                        isOpenAIModel(getModel()) ? !!openaiApiKey : !!apiKey
+                        isOpenAIModel(getModel()) ? !!openaiApiKey :
+                            isGeminiModel(getModel()) ? !!geminiApiKey : !!apiKey
                 }
                 trialMode={trialModeNow}
                 currentModel={currentModel}
@@ -175,6 +181,7 @@ const ChatPanel = ({vm}) => {
                     initialApiKey={apiKey}
                     initialDeepSeekApiKey={deepseekApiKey}
                     initialOpenAIApiKey={openaiApiKey}
+                    initialGeminiApiKey={geminiApiKey}
                     initialModel={getModel()}
                     onSave={handleSaveApiKey}
                     onClose={() => setShowModal(false)}

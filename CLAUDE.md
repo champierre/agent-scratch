@@ -5,7 +5,7 @@
 Scratch エディタに組み込まれた AI エージェント。ユーザーの自然言語指示から Scratch プロジェクトを自動生成する。
 
 - **フロントエンド**: React + webpack、Scratch GUI を組み込み
-- **AI**: Anthropic Claude API / DeepSeek API / OpenAI API（後二者は OpenAI 互換ループを共用）
+- **AI**: Anthropic Claude API / DeepSeek API / OpenAI API / Google Gemini API（Anthropic 以外は OpenAI 互換ループを共用。Gemini は generativelanguage.googleapis.com の OpenAI 互換エンドポイント）
 - **試用モード**: Cloudflare Worker プロキシ経由（DeepSeek deepseek-chat）
 - **デプロイ**: GitHub Pages（`npm run build` → `build/` ディレクトリ）
 
@@ -17,7 +17,7 @@ npm install
 npm start              # http://localhost:8602/
 ```
 
-`.env` に `DEV_DEEPSEEK_API_KEY`・`DEV_ANTHROPIC_API_KEY`・`DEV_OPENAI_API_KEY` を設定するとブラウザへの手動入力が不要になる。本番ビルドにはキーは含まれない。
+`.env` に `DEV_DEEPSEEK_API_KEY`・`DEV_ANTHROPIC_API_KEY`・`DEV_OPENAI_API_KEY`・`DEV_GEMINI_API_KEY` を設定するとブラウザへの手動入力が不要になる。本番ビルドにはキーは含まれない。
 
 ## ブランチ・PRルール
 

@@ -3,7 +3,7 @@ import scratchblocks from 'scratchblocks';
 import jaLocale from 'scratchblocks/locales/ja.json';
 import jaHiraLocale from 'scratchblocks/locales/ja-Hira.json';
 import {BLOCK_LABELS, getBlockLabel, findOpcodeByJaName, isRedundantJaAnnotation} from '../../agent/block-labels.js';
-import {isDeepSeekModel, isOpenAIModel} from '../../agent/agent-loop';
+import {isDeepSeekModel, isOpenAIModel, isGeminiModel} from '../../agent/agent-loop';
 import './chat-panel.css';
 
 // 日本語ロケールを登録
@@ -257,11 +257,13 @@ const MessageRow = ({message}) => {
 const PRICING_PAGES = {
     anthropic: {label: 'Anthropic', url: 'https://docs.claude.com/en/docs/about-claude/pricing'},
     deepseek: {label: 'DeepSeek', url: 'https://api-docs.deepseek.com/quick_start/pricing'},
-    openai: {label: 'OpenAI', url: 'https://platform.openai.com/docs/pricing'}
+    openai: {label: 'OpenAI', url: 'https://platform.openai.com/docs/pricing'},
+    gemini: {label: 'Google Gemini', url: 'https://ai.google.dev/gemini-api/docs/pricing'}
 };
 const pricingPageFor = model => {
     if (isDeepSeekModel(model)) return PRICING_PAGES.deepseek;
     if (isOpenAIModel(model)) return PRICING_PAGES.openai;
+    if (isGeminiModel(model)) return PRICING_PAGES.gemini;
     return PRICING_PAGES.anthropic;
 };
 
