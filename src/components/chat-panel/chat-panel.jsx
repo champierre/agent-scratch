@@ -205,9 +205,8 @@ const ThinkingRow = ({drafting}) => (
 );
 
 const SUGGESTIONS = [
-    {label: 'ネコ逃げを教えて', text: 'https://github.com/champierre/nekonige で紹介しているネコ逃げゲームの作り方を教えて'},
-    {label: 'ネコを動かして', text: 'ネコが旗をクリックしたら右に動き続けるようにして'},
-    {label: 'ボール跳ね返りゲーム', text: 'ボールが跳ね返るゲームを作って'}
+    {label: 'ネコ逃げを教えて', text: 'https://github.com/champierre/nekonige で紹介しているネコ逃げゲームの作り方を教えて', disableBlocks: true},
+    {label: 'ネコを動かして', text: 'ネコが旗をクリックしたら右に動き続けるようにして'}
 ];
 
 const ChatPanel = ({
@@ -223,7 +222,8 @@ const ChatPanel = ({
     onSend,
     onStop,
     onOpenSettings,
-    onToggleBlocks
+    onToggleBlocks,
+    onSetBlocksEnabled
 }) => {
     const canSend = hasApiKey || trialMode;
     const [input, setInput] = useState('');
@@ -333,14 +333,20 @@ const ChatPanel = ({
                     onChange={e => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
                 />
-                {messages.length === 0 && !running && (
+                {!running && (
                     <div className="as-chat-suggestions">
                         {SUGGESTIONS.map(s => (
                             <button
                                 key={s.label}
                                 className="as-chat-suggestion-badge"
                                 disabled={!canSend}
-                                onClick={() => { if (canSend) onSend(s.text); }}
+                                onClick={() => {
+                                    if (!canSend) return;
+                                    if (s.disableBlocks && blocksEnabled && onSetBlocksEnabled) {
+                                        onSetBlocksEnabled(false);
+                                    }
+                                    onSend(s.text);
+                                }}
                             >{s.label}</button>
                         ))}
                     </div>

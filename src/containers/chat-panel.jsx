@@ -30,6 +30,8 @@ const ChatPanel = ({vm}) => {
     // Anthropic API 形式の会話履歴(マルチターン対応)
     const apiMessagesRef = useRef([]);
     const abortRef = useRef(null);
+    // blocksEnabled の最新値を ref でも保持 — useCallback の依存配列遅延を回避するため
+    const blocksEnabledRef = useRef(blocksEnabled);
 
     const appendMessage = useCallback(m => {
         setMessages(prev => [...prev, m]);
@@ -100,7 +102,7 @@ const ChatPanel = ({vm}) => {
                 userText: text,
                 apiMessages: apiMessagesRef.current,
                 signal: controller.signal,
-                blocksEnabled,
+                blocksEnabled: blocksEnabledRef.current,
                 onAssistantStart: startAssistant,
                 onAssistantDelta: appendAssistantDelta,
                 onAssistantText: t => appendMessage({role: 'assistant', text: t}),
@@ -129,7 +131,7 @@ const ChatPanel = ({vm}) => {
             finishStreaming();
             abortRef.current = null;
         }
-    }, [vm, apiKey, blocksEnabled, appendMessage, finishLastTool, handleUsage, startAssistant, appendAssistantDelta, finishStreaming]);
+    }, [vm, apiKey, appendMessage, finishLastTool, handleUsage, startAssistant, appendAssistantDelta, finishStreaming]);
 
     const handleStop = useCallback(() => {
         if (abortRef.current) abortRef.current.abort();
@@ -168,7 +170,8 @@ const ChatPanel = ({vm}) => {
                 onSend={handleSend}
                 onStop={handleStop}
                 onOpenSettings={() => setShowModal(true)}
-                onToggleBlocks={() => setBlocksEnabled(v => !v)}
+                onToggleBlocks={() => setBlocksEnabled(v => { blocksEnabledRef.current = !v; return !v; })}
+                onSetBlocksEnabled={v => { blocksEnabledRef.current = v; setBlocksEnabled(v); }}
             />
             {showDisclosure && (
                 <DisclosureModal

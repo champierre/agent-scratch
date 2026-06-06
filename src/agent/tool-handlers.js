@@ -72,6 +72,10 @@ const targetSummary = target => {
     return summary;
 };
 
+const blockGuard = blocksEnabled => {
+    if (!blocksEnabled) throw new ToolError('ブロック操作は現在オフになっています。');
+};
+
 export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
 
     get_project_state: () => ({
@@ -92,6 +96,7 @@ export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
     },
 
     add_sprite: async ({name}) => {
+        blockGuard(blocksEnabled);
         const item = findSpriteByName(name);
         if (!item) {
             const candidates = searchSprites(name, 5).map(s => s.name);
@@ -109,6 +114,7 @@ export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
     },
 
     delete_sprite: ({target}) => {
+        blockGuard(blocksEnabled);
         const t = findTarget(vm, target);
         if (t.isStage) throw new ToolError('ステージは削除できません');
         vm.deleteSprite(t.id);
@@ -116,6 +122,7 @@ export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
     },
 
     rename_sprite: ({target, new_name}) => {
+        blockGuard(blocksEnabled);
         const t = findTarget(vm, target);
         if (t.isStage) throw new ToolError('ステージの名前は変更できません');
         vm.renameSprite(t.id, new_name);
@@ -123,6 +130,7 @@ export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
     },
 
     add_costume: async ({target, costume_name}) => {
+        blockGuard(blocksEnabled);
         const t = findTarget(vm, target);
         const item = findCostumeByName(costume_name);
         if (!item) {
@@ -137,6 +145,7 @@ export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
     },
 
     add_sound: async ({target, sound_name}) => {
+        blockGuard(blocksEnabled);
         const t = findTarget(vm, target);
         const item = findSoundByName(sound_name);
         if (!item) {
@@ -150,6 +159,7 @@ export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
     },
 
     add_backdrop: async ({backdrop_name}) => {
+        blockGuard(blocksEnabled);
         const item = findBackdropByName(backdrop_name);
         if (!item) {
             const candidates = searchBackdrops(backdrop_name, 5).map(b => b.name);
@@ -162,9 +172,7 @@ export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
     },
 
     set_scripts: async ({target, scripts}) => {
-        if (!blocksEnabled) {
-            throw new ToolError('ブロック操作は現在オフになっています。');
-        }
+        blockGuard(blocksEnabled);
         const t = findTarget(vm, target);
         const resolveVariable = makeVariableResolver(vm, t);
 
@@ -205,6 +213,7 @@ export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
     },
 
     set_sprite_properties: ({target, x, y, size, direction, visible}) => {
+        blockGuard(blocksEnabled);
         const t = findTarget(vm, target);
         if (t.isStage) throw new ToolError('ステージには位置などのプロパティを設定できません');
         if (typeof x === 'number' || typeof y === 'number') {
@@ -217,11 +226,13 @@ export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
     },
 
     start_project: () => {
+        blockGuard(blocksEnabled);
         vm.greenFlag();
         return {ok: true, message: '緑の旗を押しました(プロジェクト実行中)'};
     },
 
     stop_project: () => {
+        blockGuard(blocksEnabled);
         vm.stopAll();
         return {ok: true};
     },

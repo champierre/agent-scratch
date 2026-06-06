@@ -15,8 +15,20 @@ const SCRIPTS_SCHEMA = {
     }
 };
 
-// ブロック操作に関わるツール名の集合
-export const BLOCK_TOOL_NAMES = new Set(['set_scripts']);
+// blocksEnabled=false のとき除外するツール名の集合
+// (get_project_state / search_library / fetch_url は読み取り専用なので常に使用可)
+export const BLOCK_TOOL_NAMES = new Set([
+    'add_sprite',
+    'delete_sprite',
+    'rename_sprite',
+    'add_costume',
+    'add_sound',
+    'add_backdrop',
+    'set_scripts',
+    'set_sprite_properties',
+    'start_project',
+    'stop_project'
+]);
 
 export const TOOLS = [
     {
