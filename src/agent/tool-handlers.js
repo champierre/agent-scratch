@@ -41,6 +41,9 @@ export const toCorsFetchable = url => {
     return null;
 };
 
+// set_scripts 1回で組めるブロック数の上限(段階的な構築を強制)
+const MAX_BLOCKS_PER_CALL = 50;
+
 export class ToolError extends Error {}
 
 // name または id でターゲット(スプライト/ステージ)を探す
@@ -198,7 +201,7 @@ export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
         return {added: backdrop_name};
     },
 
-    set_scripts: async ({target, scripts}) => {
+    set_scripts: async ({target, scripts, append}) => {
         blockGuard(blocksEnabled);
         const t = findTarget(vm, target);
         const resolveVariable = makeVariableResolver(vm, t);
@@ -211,16 +214,49 @@ export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
             await vm.extensionManager.loadExtensionURL('pen');
         }
 
+        // メニュー/フィールドの動的許可値(実在するスプライト名・コスチューム名など)
+        const stage = vm.runtime.getTargetForStage();
+        const dynamicValues = {
+            sprites: vm.runtime.targets
+                .filter(x => x.isOriginal && !x.isStage)
+                .map(x => x.getName()),
+            costumes: t.getCostumes().map(c => c.name),
+            sounds: t.getSounds().map(snd => snd.name),
+            backdrops: stage ? stage.getCostumes().map(c => c.name) : []
+        };
+
         // 失敗時ロールバック用スナップショット
         const blocksSnapshot = {...t.blocks._blocks};
         const scriptsSnapshot = [...t.blocks._scripts];
         try {
-            const newBlocks = buildScripts(scripts, {resolveVariable});
+            const newBlocks = buildScripts(scripts, {resolveVariable, dynamicValues});
+
+            // 一度に組める量を制限(巨大スクリプトの一括生成を防ぎ、段階的な構築を強制する)
+            const realCount = Object.values(newBlocks).filter(b => !b.shadow).length;
+            if (realCount > MAX_BLOCKS_PER_CALL) {
+                throw new ToolError(
+                    `一度に組むブロックが多すぎます(${realCount}個 / 上限${MAX_BLOCKS_PER_CALL}個)。` +
+                    'スクリプトを分けて、2回目以降は append: true で追加してください');
+            }
+
             // 旧ブロックを参照する実行中スレッドを止めてから差し替える
             // (残っていると _updateGlows が消えたブロックIDを光らせようとして
             //  "Tried to glow block that does not exist" が毎フレーム発生する)
             vm.runtime.stopForTarget(t);
-            t.blocks.deleteAllBlocks();
+            if (append) {
+                // 既存スクリプトの下に新しいスクリプトを配置する
+                const existingTops = t.blocks.getScripts()
+                    .map(id => t.blocks.getBlock(id))
+                    .filter(Boolean);
+                const offsetY = existingTops.length
+                    ? Math.max(...existingTops.map(b => b.y || 0)) + 320
+                    : 0;
+                for (const block of Object.values(newBlocks)) {
+                    if (block.topLevel) block.y = (block.y || 0) + offsetY;
+                }
+            } else {
+                t.blocks.deleteAllBlocks();
+            }
             for (const block of Object.values(newBlocks)) {
                 t.blocks.createBlock(block);
             }
@@ -229,7 +265,7 @@ export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
             vm.setEditingTarget(t.id);
             vm.emitWorkspaceUpdate();
             const scriptCount = t.blocks.getScripts().length;
-            return {ok: true, target: t.getName(), script_count: scriptCount};
+            return {ok: true, target: t.getName(), appended: !!append, script_count: scriptCount};
         } catch (e) {
             t.blocks._blocks = blocksSnapshot;
             t.blocks._scripts = scriptsSnapshot;
