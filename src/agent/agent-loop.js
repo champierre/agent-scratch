@@ -2,7 +2,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import {TOOLS, BLOCK_TOOL_NAMES, summarizeToolCall, draftingLabel} from './tools';
-import {SYSTEM_PROMPT} from './system-prompt';
+import {SYSTEM_PROMPT, getBlockOperationPrompt} from './system-prompt';
 import {createToolHandlers, ToolError} from './tool-handlers';
 
 export class AuthError extends Error {}
@@ -170,7 +170,10 @@ const runOpenAICompatAgent = async ({
     const handlers = createToolHandlers(vm, {blocksEnabled});
     const activeTools = blocksEnabled ? TOOLS : TOOLS.filter(t => !BLOCK_TOOL_NAMES.has(t.name));
     const oaiTools = toOpenAITools(activeTools);
-    const systemMessages = [{role: 'system', content: SYSTEM_PROMPT}];
+    const systemMessages = [
+        {role: 'system', content: SYSTEM_PROMPT},
+        {role: 'system', content: getBlockOperationPrompt(blocksEnabled)}
+    ];
 
     apiMessages.push({role: 'user', content: [{type: 'text', text: userText}]});
 
@@ -377,7 +380,10 @@ export const runAgent = async ({
     const handlers = createToolHandlers(vm, {blocksEnabled});
 
     // システムプロンプトとツール定義は固定 → prompt caching
-    const system = [{type: 'text', text: SYSTEM_PROMPT, cache_control: {type: 'ephemeral'}}];
+    const system = [
+        {type: 'text', text: SYSTEM_PROMPT, cache_control: {type: 'ephemeral'}},
+        {type: 'text', text: getBlockOperationPrompt(blocksEnabled)}
+    ];
     const activeTools = blocksEnabled ? TOOLS : TOOLS.filter(t => !BLOCK_TOOL_NAMES.has(t.name));
     const tools = activeTools.map((tool, i) =>
         (i === activeTools.length - 1 ? {...tool, cache_control: {type: 'ephemeral'}} : tool)

@@ -79,6 +79,27 @@ const main = async () => {
         console.log('test3 OK: 初期オンで blocksEnabled=true');
     }
 
+    // --- テスト4: オフ→オン直後に送信しても blocksEnabled=true ---
+    // 各クリック間で act/flush を挟まず、ユーザーが続けて操作するケースを再現する。
+    {
+        stub.__reset();
+        const {container} = renderPanel();
+        const toggle = container.querySelector('.as-chat-toggle-switch');
+        const input = container.querySelector('.as-chat-input');
+        await act(async () => {
+            fireEvent.click(toggle); // on -> off
+            fireEvent.click(toggle); // off -> on
+            fireEvent.change(input, {target: {value: 'ネコの色を変えて'}});
+            fireEvent.click(container.querySelector('.as-chat-send'));
+        });
+        const args = stub.__getLastRunAgentArgs();
+        assert.ok(args, 'runAgent が呼ばれる');
+        assert.strictEqual(args.blocksEnabled, true,
+            'オフ→オン直後の送信でも blocksEnabled は true でなければならない');
+        cleanup();
+        console.log('test4 OK: オフ→オン直後でも blocksEnabled=true');
+    }
+
     console.log('chat-panel-toggle ALL TESTS PASSED');
 };
 

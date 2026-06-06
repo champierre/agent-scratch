@@ -80,10 +80,11 @@ const ChatPanel = ({vm, collapsed, onToggleCollapse}) => {
             appendMessage({role: 'error', text: 'Scratch エディタの読み込みが完了していません。'});
             return;
         }
-        // ブロック操作の有効/無効は state(単一の真実)を使う。
-        // サジェスト等で一時的に無効化したい場合は呼び出し時に明示指定する
-        // (state 更新は非同期なので、ここで引数として確実に受け取る)
-        const effectiveBlocksEnabled = opts.forceBlocksDisabled ? false : blocksEnabled;
+        // 通常送信では子が表示中の値を明示する。サジェスト等で一時的に
+        // 無効化する場合は forceBlocksDisabled を優先する。
+        const effectiveBlocksEnabled = opts.forceBlocksDisabled ?
+            false :
+            (typeof opts.blocksEnabled === 'boolean' ? opts.blocksEnabled : blocksEnabled);
         appendMessage({role: 'user', text});
         setRunning(true);
         const controller = new AbortController();
