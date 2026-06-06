@@ -63,13 +63,17 @@ const ChatPanel = ({vm}) => {
         setMessages(prev => prev.map(m => (m.streaming ? {...m, streaming: false} : m)));
     }, []);
 
-    // 直近の実行中ツール表示を done/error に更新する
-    const finishLastTool = useCallback(ok => {
+    // 直近の実行中ツール表示を done/error に更新する(エラー時は詳細も保持)
+    const finishLastTool = useCallback((ok, detail) => {
         setMessages(prev => {
             const next = [...prev];
             for (let i = next.length - 1; i >= 0; i--) {
                 if (next[i].role === 'tool' && next[i].status === 'running') {
-                    next[i] = {...next[i], status: ok ? 'done' : 'error'};
+                    next[i] = {
+                        ...next[i],
+                        status: ok ? 'done' : 'error',
+                        ...(detail ? {detail} : {})
+                    };
                     break;
                 }
             }
@@ -110,7 +114,7 @@ const ChatPanel = ({vm}) => {
                     setDrafting(null);
                     appendMessage({role: 'tool', text: summary, status: 'running'});
                 },
-                onToolEnd: ok => finishLastTool(ok),
+                onToolEnd: (ok, detail) => finishLastTool(ok, detail),
                 onToolDrafting: (label, chars) => {
                     setDrafting(label ? {label, chars} : null);
                 },

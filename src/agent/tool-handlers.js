@@ -16,6 +16,31 @@ const WORKER_BASE_URL = (() => {
 const TRIAL_TOKEN_KEY = 'agent-scratch-trial-token';
 const getTrialToken = () => localStorage.getItem(TRIAL_TOKEN_KEY) || '';
 
+// 直接 fetch の取得上限(コンテキスト溢れ防止)
+const FETCH_URL_MAX_CHARS = 200 * 1024;
+
+// GitHub の URL を CORS 許可のある取得先に変換する(該当しなければ null)
+// - github.com/{o}/{r}/blob/{branch}/{path} → raw.githubusercontent.com
+// - github.com/{o}/{r} (リポジトリルート) → api.github.com の README(raw)
+export const toCorsFetchable = url => {
+    const blob = url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\/([^/]+)\/(.+)$/);
+    if (blob) {
+        return {url: `https://raw.githubusercontent.com/${blob[1]}/${blob[2]}/${blob[3]}/${blob[4]}`};
+    }
+    const root = url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+?)\/?$/);
+    if (root) {
+        return {
+            url: `https://api.github.com/repos/${root[1]}/${root[2]}/readme`,
+            headers: {Accept: 'application/vnd.github.raw+json'}
+        };
+    }
+    if (url.startsWith('https://raw.githubusercontent.com/') ||
+        url.startsWith('https://api.github.com/')) {
+        return {url};
+    }
+    return null;
+};
+
 export class ToolError extends Error {}
 
 // name または id でターゲット(スプライト/ステージ)を探す
@@ -241,24 +266,47 @@ export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
 
     fetch_url: async ({url}) => {
         if (!url) throw new ToolError('url が必要です');
-        // Worker プロキシが設定されている場合はそちら経由(CORS回避)
-        // 設定されていない場合は直接 fetch(ローカル開発など)
-        const endpoint = WORKER_BASE_URL
-            ? `${WORKER_BASE_URL}/fetch-url?url=${encodeURIComponent(url)}`
-            : url;
+
+        // GitHub の URL は CORS 許可のあるエンドポイントに変換してブラウザから直接取得する
+        // (Worker プロキシはお試しトークンが必要なため、自分のキーのユーザーでも動くように)
+        const direct = toCorsFetchable(url);
         const token = getTrialToken();
+        const useProxy = !direct && WORKER_BASE_URL && token;
+
+        let endpoint;
+        let headers;
+        if (direct) {
+            endpoint = direct.url;
+            headers = direct.headers;
+        } else if (useProxy) {
+            // GitHub 以外の URL はプロキシ経由(お試しトークンがある場合のみ)
+            endpoint = `${WORKER_BASE_URL}/fetch-url?url=${encodeURIComponent(url)}`;
+            headers = {Authorization: `Bearer ${token}`};
+        } else {
+            // 直接 fetch を試す(CORS許可のあるサイトなら成功する)
+            endpoint = url;
+        }
+
         let res;
         try {
-            res = await fetch(endpoint, token ? {headers: {Authorization: `Bearer ${token}`}} : undefined);
+            res = await fetch(endpoint, headers ? {headers} : undefined);
         } catch (e) {
-            throw new ToolError(`ネットワークエラー: ${e.message}`);
+            throw new ToolError(
+                `ネットワークエラー: ${e.message}` +
+                (direct || useProxy ? '' : '(このサイトはブラウザから直接取得できない可能性があります)'));
         }
         if (!res.ok) {
             let errMsg = `HTTP ${res.status}`;
             try { const body = await res.json(); errMsg = body.error || errMsg; } catch { /* ignore */ }
-            throw new ToolError(`取得失敗: ${errMsg}`);
+            throw new ToolError(`取得失敗: ${errMsg} (${endpoint})`);
         }
-        const data = WORKER_BASE_URL ? await res.json() : {text: await res.text(), truncated: false};
+        let data;
+        if (useProxy) {
+            data = await res.json();
+        } else {
+            const text = (await res.text()).slice(0, FETCH_URL_MAX_CHARS);
+            data = {text, truncated: text.length >= FETCH_URL_MAX_CHARS};
+        }
         return {
             url,
             text: data.text,
