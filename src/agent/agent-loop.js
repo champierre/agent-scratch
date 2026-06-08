@@ -2,7 +2,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import {TOOLS, BLOCK_TOOL_NAMES, summarizeToolCall, draftingLabel} from './tools';
-import {SYSTEM_PROMPT, getBlockOperationPrompt} from './system-prompt';
+import {getSystemPrompt, getBlockOperationPrompt} from './system-prompt';
 import {createToolHandlers, ToolError} from './tool-handlers';
 
 export class AuthError extends Error {}
@@ -150,6 +150,7 @@ const runOpenAICompatAgent = async ({
     apiMessages,
     signal,
     blocksEnabled,
+    lang = 'ja',
     onAssistantStart,
     onAssistantDelta,
     onAssistantText,
@@ -171,8 +172,8 @@ const runOpenAICompatAgent = async ({
     const activeTools = blocksEnabled ? TOOLS : TOOLS.filter(t => !BLOCK_TOOL_NAMES.has(t.name));
     const oaiTools = toOpenAITools(activeTools);
     const systemMessages = [
-        {role: 'system', content: SYSTEM_PROMPT},
-        {role: 'system', content: getBlockOperationPrompt(blocksEnabled)}
+        {role: 'system', content: getSystemPrompt(lang)},
+        {role: 'system', content: getBlockOperationPrompt(blocksEnabled, lang)}
     ];
 
     apiMessages.push({role: 'user', content: [{type: 'text', text: userText}]});
@@ -216,7 +217,7 @@ const runOpenAICompatAgent = async ({
                         if (!partialToolCalls[tc.index]) {
                             partialToolCalls[tc.index] = {id: '', type: 'function', function: {name: '', arguments: ''}};
                             if (onToolDrafting && tc.function?.name) {
-                                onToolDrafting(draftingLabel(tc.function.name), 0);
+                                onToolDrafting(draftingLabel(tc.function.name, lang), 0);
                             }
                         }
                         const p = partialToolCalls[tc.index];
@@ -225,7 +226,7 @@ const runOpenAICompatAgent = async ({
                         if (tc.function?.arguments) {
                             p.function.arguments += tc.function.arguments;
                             if (onToolDrafting) {
-                                onToolDrafting(draftingLabel(p.function.name), p.function.arguments.length);
+                                onToolDrafting(draftingLabel(p.function.name, lang), p.function.arguments.length);
                             }
                         }
                     }
@@ -238,10 +239,16 @@ const runOpenAICompatAgent = async ({
             toolCalls = Object.values(partialToolCalls);
         } catch (e) {
             if (e?.status === 401 || e?.code === 'invalid_api_key') throw new AuthError(e.message);
-            if (e?.status === 429) throw new Error('混み合っています。少し待ってからもう一度試してください。');
+            if (e?.status === 429) {
+                throw new Error(lang === 'en' ?
+                    'The service is busy. Please wait a moment and try again.' :
+                    '混み合っています。少し待ってからもう一度試してください。');
+            }
             if (e?.status >= 500) {
                 // Gemini等で頻発する一時的なサーバ過負荷(503など)
-                throw new Error(
+                throw new Error(lang === 'en' ?
+                    `The AI server is busy or temporarily unavailable (${e.status}). ` +
+                    'Please wait a moment and send the same message again.' :
                     `AIサーバが混み合っているか一時的に不調です(${e.status})。` +
                     '少し待ってから、同じ内容をもう一度送ってください。');
             }
@@ -267,7 +274,7 @@ const runOpenAICompatAgent = async ({
             if (signal && signal.aborted) return;
             let input = {};
             try { input = JSON.parse(tc.function.arguments); } catch { /* ignore */ }
-            onToolStart(summarizeToolCall(tc.function.name, input));
+            onToolStart(summarizeToolCall(tc.function.name, input, lang));
             let result;
             let isError = false;
             try {
@@ -307,6 +314,7 @@ export const runAgent = async ({
     apiMessages,
     signal,
     blocksEnabled = true,
+    lang = 'ja',
     onAssistantStart,
     onAssistantDelta,
     onAssistantText,
@@ -324,7 +332,7 @@ export const runAgent = async ({
             baseURL: TRIAL_PROXY_URL,
             model: TRIAL_MODEL,
             // お試しモードはブロック操作不可(説明・解説モード固定)
-            vm, userText, apiMessages, signal, blocksEnabled: false,
+            vm, userText, apiMessages, signal, blocksEnabled: false, lang,
             onAssistantStart, onAssistantDelta, onAssistantText,
             onToolStart, onToolEnd, onToolDrafting
         });
@@ -333,9 +341,9 @@ export const runAgent = async ({
     // DeepSeekモデルが選択されている場合はOpenAI互換ループへ
     if (isDeepSeekModel(model)) {
         const deepseekApiKey = getDeepSeekApiKey();
-        if (!deepseekApiKey) throw new AuthError('DeepSeek APIキーが設定されていません。⚙️ から設定してください。');
+        if (!deepseekApiKey) throw new AuthError(lang === 'en' ? 'No DeepSeek API key is set. Please set it from ⚙️.' : 'DeepSeek APIキーが設定されていません。⚙️ から設定してください。');
         return runOpenAICompatAgent({
-            apiKey: deepseekApiKey, vm, userText, apiMessages, signal, blocksEnabled,
+            apiKey: deepseekApiKey, vm, userText, apiMessages, signal, blocksEnabled, lang,
             onAssistantStart, onAssistantDelta, onAssistantText,
             onToolStart, onToolEnd, onToolDrafting
         });
@@ -344,11 +352,11 @@ export const runAgent = async ({
     // OpenAI (GPT) モデルが選択されている場合もOpenAI互換ループへ
     if (isOpenAIModel(model)) {
         const openaiApiKey = getOpenAIApiKey();
-        if (!openaiApiKey) throw new AuthError('OpenAI APIキーが設定されていません。⚙️ から設定してください。');
+        if (!openaiApiKey) throw new AuthError(lang === 'en' ? 'No OpenAI API key is set. Please set it from ⚙️.' : 'OpenAI APIキーが設定されていません。⚙️ から設定してください。');
         return runOpenAICompatAgent({
             apiKey: openaiApiKey,
             baseURL: 'https://api.openai.com/v1',
-            vm, userText, apiMessages, signal, blocksEnabled,
+            vm, userText, apiMessages, signal, blocksEnabled, lang,
             onAssistantStart, onAssistantDelta, onAssistantText,
             onToolStart, onToolEnd, onToolDrafting
         });
@@ -357,12 +365,12 @@ export const runAgent = async ({
     // Google Gemini モデルもOpenAI互換エンドポイント経由で同じループへ
     if (isGeminiModel(model)) {
         const geminiApiKey = getGeminiApiKey();
-        if (!geminiApiKey) throw new AuthError('Gemini APIキーが設定されていません。⚙️ から設定してください。');
+        if (!geminiApiKey) throw new AuthError(lang === 'en' ? 'No Gemini API key is set. Please set it from ⚙️.' : 'Gemini APIキーが設定されていません。⚙️ から設定してください。');
         return runOpenAICompatAgent({
             apiKey: geminiApiKey,
             baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai',
             stripSdkHeaders: true,
-            vm, userText, apiMessages, signal, blocksEnabled,
+            vm, userText, apiMessages, signal, blocksEnabled, lang,
             onAssistantStart, onAssistantDelta, onAssistantText,
             onToolStart, onToolEnd, onToolDrafting
         });
@@ -381,8 +389,8 @@ export const runAgent = async ({
 
     // システムプロンプトとツール定義は固定 → prompt caching
     const system = [
-        {type: 'text', text: SYSTEM_PROMPT, cache_control: {type: 'ephemeral'}},
-        {type: 'text', text: getBlockOperationPrompt(blocksEnabled)}
+        {type: 'text', text: getSystemPrompt(lang), cache_control: {type: 'ephemeral'}},
+        {type: 'text', text: getBlockOperationPrompt(blocksEnabled, lang)}
     ];
     const activeTools = blocksEnabled ? TOOLS : TOOLS.filter(t => !BLOCK_TOOL_NAMES.has(t.name));
     const tools = activeTools.map((tool, i) =>
@@ -419,7 +427,7 @@ export const runAgent = async ({
                 stream.on('streamEvent', event => {
                     if (event.type === 'content_block_start' &&
                         event.content_block.type === 'tool_use') {
-                        draftLabel = draftingLabel(event.content_block.name);
+                        draftLabel = draftingLabel(event.content_block.name, lang);
                         draftChars = 0;
                         onToolDrafting(draftLabel, 0);
                     } else if (event.type === 'content_block_delta' &&
@@ -439,10 +447,14 @@ export const runAgent = async ({
                 throw new AuthError(e.message);
             }
             if (e instanceof Anthropic.RateLimitError) {
-                throw new Error('混み合っています。少し待ってからもう一度試してください。');
+                throw new Error(lang === 'en' ?
+                    'The service is busy. Please wait a moment and try again.' :
+                    '混み合っています。少し待ってからもう一度試してください。');
             }
             if (e instanceof Anthropic.InternalServerError) {
-                throw new Error(
+                throw new Error(lang === 'en' ?
+                    `The AI server is busy or temporarily unavailable (${e.status}). ` +
+                    'Please wait a moment and send the same message again.' :
                     `AIサーバが混み合っているか一時的に不調です(${e.status})。` +
                     '少し待ってから、同じ内容をもう一度送ってください。');
             }
@@ -455,16 +467,22 @@ export const runAgent = async ({
             }
             if (e instanceof Anthropic.BadRequestError &&
                 String(e.message).includes('model not allowed')) {
-                throw new Error('お試しモードでは使えないモデルです。⚙️ から自分のAPIキーを設定してください。');
+                throw new Error(lang === 'en' ?
+                    'This model is not available in trial mode. Please set your own API key from ⚙️.' :
+                    'お試しモードでは使えないモデルです。⚙️ から自分のAPIキーを設定してください。');
             }
             if (e instanceof Anthropic.APIConnectionTimeoutError) {
-                throw new Error('時間がかかりすぎたため中断しました。タスクを小さく分けて指示してみてください(例:「まずボールとパドルだけ作って」)。');
+                throw new Error(lang === 'en' ?
+                    'It took too long, so it was canceled. Try breaking the task into smaller steps (e.g. "First make just the ball and paddle").' :
+                    '時間がかかりすぎたため中断しました。タスクを小さく分けて指示してみてください(例:「まずボールとパドルだけ作って」)。');
             }
             if (e instanceof Anthropic.APIUserAbortError) {
                 return; // ユーザーによる停止
             }
             if (e instanceof Anthropic.APIConnectionError) {
-                throw new Error('Anthropic API に接続できませんでした。ネットワークを確認してください。');
+                throw new Error(lang === 'en' ?
+                    'Could not connect to the Anthropic API. Please check your network.' :
+                    'Anthropic API に接続できませんでした。ネットワークを確認してください。');
             }
             throw e;
         }
@@ -474,7 +492,9 @@ export const runAgent = async ({
 
         if (response.stop_reason !== 'tool_use') {
             if (response.stop_reason === 'max_tokens') {
-                onAssistantText('(出力が長すぎて途中で切れました。続きを指示してください)');
+                onAssistantText(lang === 'en' ?
+                    '(The output was too long and got cut off. Please ask me to continue.)' :
+                    '(出力が長すぎて途中で切れました。続きを指示してください)');
             }
             return;
         }
@@ -484,7 +504,7 @@ export const runAgent = async ({
         for (const block of response.content) {
             if (block.type !== 'tool_use') continue;
             if (signal && signal.aborted) return;
-            onToolStart(summarizeToolCall(block.name, block.input));
+            onToolStart(summarizeToolCall(block.name, block.input, lang));
             let result;
             let isError = false;
             try {

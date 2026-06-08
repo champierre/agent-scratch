@@ -65,6 +65,17 @@ const baseProps = () => ({
     console.log('test3 OK: ▶ クリックで onToggleCollapse 発火');
 }
 
+// --- テスト4: lang='en' では英語UI(タイトル・送信ボタン)を描画する ---
+{
+    const {container} = render(React.createElement(ChatPanel, {...baseProps(), collapsed: false, lang: 'en'}));
+    assert.ok(container.textContent.includes('AI Assistant'), '英語タイトルが表示される');
+    assert.ok(!container.textContent.includes('AI アシスタント'), '日本語タイトルは出ない');
+    assert.ok(container.querySelector('.as-chat-send').textContent.includes('Send'), '送信ボタンが英語');
+    assert.ok(!container.textContent.includes('ブロック操作'), 'トグル文言も英語化される');
+    cleanup();
+    console.log('test4 OK: lang=en で英語UI');
+}
+
 console.log('chat-panel-ui ALL TESTS PASSED');
 // React scheduler / jsdom がイベントループにハンドルを残しプロセスが
 // 自然終了しないため、明示的に終了する(CIのハング防止)

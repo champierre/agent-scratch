@@ -1,22 +1,27 @@
 import React, {useState} from 'react';
 import {isDeepSeekModel, isOpenAIModel, isGeminiModel} from '../../agent/agent-loop';
+import {STRINGS} from '../../i18n';
 import './api-key-modal.css';
 
+// label はモデル名 + 言語別の補足注記({ja, en})
 const MODELS = [
-    {id: 'deepseek-chat', label: 'DeepSeek V3(低コスト・高性能) ★推奨', provider: 'deepseek'},
-    {id: 'deepseek-reasoner', label: 'DeepSeek R1(推論特化)', provider: 'deepseek'},
-    {id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5(最速・最安)', provider: 'anthropic'},
-    {id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6(バランス型)', provider: 'anthropic'},
-    {id: 'claude-opus-4-8', label: 'Claude Opus 4.8(最高性能・高コスト)', provider: 'anthropic'},
-    {id: 'gpt-5.1', label: 'GPT-5.1(高性能)', provider: 'openai'},
-    {id: 'gpt-5-mini', label: 'GPT-5 mini(低コスト)', provider: 'openai'},
-    {id: 'gpt-5-nano', label: 'GPT-5 nano(最速・最安)', provider: 'openai'},
-    {id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro(高性能)', provider: 'gemini'},
-    {id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash(バランス型)', provider: 'gemini'},
-    {id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite(最速・最安)', provider: 'gemini'}
+    {id: 'deepseek-chat', name: 'DeepSeek V3', note: {ja: '(低コスト・高性能) ★推奨', en: '(low cost, high performance) ★recommended'}, provider: 'deepseek'},
+    {id: 'deepseek-reasoner', name: 'DeepSeek R1', note: {ja: '(推論特化)', en: '(reasoning-focused)'}, provider: 'deepseek'},
+    {id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5', note: {ja: '(最速・最安)', en: '(fastest, cheapest)'}, provider: 'anthropic'},
+    {id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', note: {ja: '(バランス型)', en: '(balanced)'}, provider: 'anthropic'},
+    {id: 'claude-opus-4-8', name: 'Claude Opus 4.8', note: {ja: '(最高性能・高コスト)', en: '(top performance, high cost)'}, provider: 'anthropic'},
+    {id: 'gpt-5.1', name: 'GPT-5.1', note: {ja: '(高性能)', en: '(high performance)'}, provider: 'openai'},
+    {id: 'gpt-5-mini', name: 'GPT-5 mini', note: {ja: '(低コスト)', en: '(low cost)'}, provider: 'openai'},
+    {id: 'gpt-5-nano', name: 'GPT-5 nano', note: {ja: '(最速・最安)', en: '(fastest, cheapest)'}, provider: 'openai'},
+    {id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', note: {ja: '(高性能)', en: '(high performance)'}, provider: 'gemini'},
+    {id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', note: {ja: '(バランス型)', en: '(balanced)'}, provider: 'gemini'},
+    {id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash-Lite', note: {ja: '(最速・最安)', en: '(fastest, cheapest)'}, provider: 'gemini'}
 ];
 
-const ApiKeyModal = ({initialApiKey, initialDeepSeekApiKey, initialOpenAIApiKey, initialGeminiApiKey, initialModel, onSave, onClose}) => {
+const modelLabel = (m, lang) => `${m.name}${m.note[lang] || m.note.ja}`;
+
+const ApiKeyModal = ({lang = 'ja', initialApiKey, initialDeepSeekApiKey, initialOpenAIApiKey, initialGeminiApiKey, initialModel, onSave, onClose}) => {
+    const t = STRINGS[lang];
     const [value, setValue] = useState(initialApiKey || '');
     const [deepseekValue, setDeepseekValue] = useState(initialDeepSeekApiKey || '');
     const [openaiValue, setOpenaiValue] = useState(initialOpenAIApiKey || '');
@@ -38,10 +43,10 @@ const ApiKeyModal = ({initialApiKey, initialDeepSeekApiKey, initialOpenAIApiKey,
     return (
         <div className="as-modal-overlay" onClick={onClose}>
             <div className="as-modal" onClick={e => e.stopPropagation()}>
-                <div className="as-modal-header">API キー / モデル設定</div>
+                <div className="as-modal-header">{t.modalTitle}</div>
                 <div className="as-modal-body">
                     <label className="as-modal-label">
-                        使用モデル
+                        {t.modalModelLabel}
                         <select
                             className="as-modal-select"
                             value={model}
@@ -49,22 +54,22 @@ const ApiKeyModal = ({initialApiKey, initialDeepSeekApiKey, initialOpenAIApiKey,
                         >
                             <optgroup label="DeepSeek">
                                 {MODELS.filter(m => m.provider === 'deepseek').map(m => (
-                                    <option key={m.id} value={m.id}>{m.label}</option>
+                                    <option key={m.id} value={m.id}>{modelLabel(m, lang)}</option>
                                 ))}
                             </optgroup>
                             <optgroup label="Anthropic (Claude)">
                                 {MODELS.filter(m => m.provider === 'anthropic').map(m => (
-                                    <option key={m.id} value={m.id}>{m.label}</option>
+                                    <option key={m.id} value={m.id}>{modelLabel(m, lang)}</option>
                                 ))}
                             </optgroup>
                             <optgroup label="OpenAI (GPT)">
                                 {MODELS.filter(m => m.provider === 'openai').map(m => (
-                                    <option key={m.id} value={m.id}>{m.label}</option>
+                                    <option key={m.id} value={m.id}>{modelLabel(m, lang)}</option>
                                 ))}
                             </optgroup>
                             <optgroup label="Google (Gemini)">
                                 {MODELS.filter(m => m.provider === 'gemini').map(m => (
-                                    <option key={m.id} value={m.id}>{m.label}</option>
+                                    <option key={m.id} value={m.id}>{modelLabel(m, lang)}</option>
                                 ))}
                             </optgroup>
                         </select>
@@ -73,8 +78,8 @@ const ApiKeyModal = ({initialApiKey, initialDeepSeekApiKey, initialOpenAIApiKey,
                     {!needsDeepSeek && !needsOpenAI && !needsGemini && (
                         <>
                             <p style={{marginTop: '12px'}}>
-                                Claude を利用するための Anthropic API キーを入力してください。
-                                キーはこのブラウザの localStorage にのみ保存されます。
+                                {t.anthropicDesc}
+                                {t.keyStoredNote}
                             </p>
                             <input
                                 type="password"
@@ -86,7 +91,7 @@ const ApiKeyModal = ({initialApiKey, initialDeepSeekApiKey, initialOpenAIApiKey,
                                 onKeyDown={e => { if (e.key === 'Enter') save(); }}
                             />
                             <p className="as-modal-hint">
-                                API キーは <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer">Anthropic Console</a> で取得できます。
+                                {t.hintPrefix}<a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer">Anthropic Console</a>{t.hintSuffix}
                             </p>
                         </>
                     )}
@@ -94,8 +99,8 @@ const ApiKeyModal = ({initialApiKey, initialDeepSeekApiKey, initialOpenAIApiKey,
                     {needsDeepSeek && (
                         <>
                             <p style={{marginTop: '12px'}}>
-                                DeepSeek API キーを入力してください。
-                                キーはこのブラウザの localStorage にのみ保存されます。
+                                {t.deepseekDesc}
+                                {t.keyStoredNote}
                             </p>
                             <input
                                 type="password"
@@ -107,7 +112,7 @@ const ApiKeyModal = ({initialApiKey, initialDeepSeekApiKey, initialOpenAIApiKey,
                                 onKeyDown={e => { if (e.key === 'Enter') save(); }}
                             />
                             <p className="as-modal-hint">
-                                API キーは <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noreferrer">DeepSeek Platform</a> で取得できます。
+                                {t.hintPrefix}<a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noreferrer">DeepSeek Platform</a>{t.hintSuffix}
                             </p>
                         </>
                     )}
@@ -115,8 +120,8 @@ const ApiKeyModal = ({initialApiKey, initialDeepSeekApiKey, initialOpenAIApiKey,
                     {needsOpenAI && (
                         <>
                             <p style={{marginTop: '12px'}}>
-                                OpenAI API キーを入力してください。
-                                キーはこのブラウザの localStorage にのみ保存されます。
+                                {t.openaiDesc}
+                                {t.keyStoredNote}
                             </p>
                             <input
                                 type="password"
@@ -128,7 +133,7 @@ const ApiKeyModal = ({initialApiKey, initialDeepSeekApiKey, initialOpenAIApiKey,
                                 onKeyDown={e => { if (e.key === 'Enter') save(); }}
                             />
                             <p className="as-modal-hint">
-                                API キーは <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer">OpenAI Platform</a> で取得できます。
+                                {t.hintPrefix}<a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer">OpenAI Platform</a>{t.hintSuffix}
                             </p>
                         </>
                     )}
@@ -136,8 +141,8 @@ const ApiKeyModal = ({initialApiKey, initialDeepSeekApiKey, initialOpenAIApiKey,
                     {needsGemini && (
                         <>
                             <p style={{marginTop: '12px'}}>
-                                Google Gemini API キーを入力してください。
-                                キーはこのブラウザの localStorage にのみ保存されます。
+                                {t.geminiDesc}
+                                {t.keyStoredNote}
                             </p>
                             <input
                                 type="password"
@@ -149,18 +154,18 @@ const ApiKeyModal = ({initialApiKey, initialDeepSeekApiKey, initialOpenAIApiKey,
                                 onKeyDown={e => { if (e.key === 'Enter') save(); }}
                             />
                             <p className="as-modal-hint">
-                                API キーは <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer">Google AI Studio</a> で取得できます。
+                                {t.hintPrefix}<a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer">Google AI Studio</a>{t.hintSuffix}
                             </p>
                         </>
                     )}
                 </div>
                 <div className="as-modal-footer">
-                    <button className="as-modal-button as-modal-cancel" onClick={onClose}>キャンセル</button>
+                    <button className="as-modal-button as-modal-cancel" onClick={onClose}>{t.modalCancel}</button>
                     <button
                         className="as-modal-button as-modal-save"
                         disabled={!canSave}
                         onClick={save}
-                    >保存</button>
+                    >{t.modalSave}</button>
                 </div>
             </div>
         </div>

@@ -3,11 +3,13 @@ import ChatPanelComponent from '../components/chat-panel/chat-panel.jsx';
 import ApiKeyModal from '../components/api-key-modal/api-key-modal.jsx';
 import DisclosureModal from '../components/disclosure-modal/disclosure-modal.jsx';
 import {runAgent, AuthError, getModel, setModel, isTrialAvailable, getDeepSeekApiKey, setDeepSeekApiKey, isDeepSeekModel, getOpenAIApiKey, setOpenAIApiKey, isOpenAIModel, getGeminiApiKey, setGeminiApiKey, isGeminiModel, DEV_ANTHROPIC_KEY} from '../agent/agent-loop';
+import {STRINGS, errorPrefix} from '../i18n';
 
 const STORAGE_KEY = 'agent-scratch-api-key';
 const DISCLOSURE_STORAGE_KEY = 'agent-scratch-disclosure-accepted';
 
-const ChatPanel = ({vm, collapsed, onToggleCollapse}) => {
+const ChatPanel = ({vm, lang = 'ja', collapsed, onToggleCollapse}) => {
+    const t = STRINGS[lang];
     const [messages, setMessages] = useState([]);
     const [running, setRunning] = useState(false);
     const [apiKey, setApiKey] = useState(() => localStorage.getItem(STORAGE_KEY) || DEV_ANTHROPIC_KEY || '');
@@ -77,7 +79,7 @@ const ChatPanel = ({vm, collapsed, onToggleCollapse}) => {
 
     const handleSend = useCallback(async (text, opts = {}) => {
         if (!vm) {
-            appendMessage({role: 'error', text: 'Scratch エディタの読み込みが完了していません。'});
+            appendMessage({role: 'error', text: t.vmNotReady});
             return;
         }
         // 通常送信では子が表示中の値を明示する。サジェスト等で一時的に
@@ -97,6 +99,7 @@ const ChatPanel = ({vm, collapsed, onToggleCollapse}) => {
                 apiMessages: apiMessagesRef.current,
                 signal: controller.signal,
                 blocksEnabled: effectiveBlocksEnabled,
+                lang,
                 onAssistantStart: startAssistant,
                 onAssistantDelta: appendAssistantDelta,
                 onAssistantText: t => appendMessage({role: 'assistant', text: t}),
@@ -111,12 +114,12 @@ const ChatPanel = ({vm, collapsed, onToggleCollapse}) => {
             });
         } catch (e) {
             if (e instanceof AuthError) {
-                appendMessage({role: 'error', text: 'APIキーが無効です。設定し直してください。'});
+                appendMessage({role: 'error', text: t.authInvalid});
                 setShowModal(true);
             } else if (e.name === 'AbortError' || controller.signal.aborted) {
-                appendMessage({role: 'assistant', text: '(停止しました)'});
+                appendMessage({role: 'assistant', text: t.stopped});
             } else {
-                appendMessage({role: 'error', text: `エラー: ${e.message}`});
+                appendMessage({role: 'error', text: errorPrefix(lang, e.message)});
             }
         } finally {
             setRunning(false);
@@ -124,7 +127,7 @@ const ChatPanel = ({vm, collapsed, onToggleCollapse}) => {
             finishStreaming();
             abortRef.current = null;
         }
-    }, [vm, apiKey, blocksEnabled, appendMessage, finishLastTool, startAssistant, appendAssistantDelta, finishStreaming]);
+    }, [vm, apiKey, blocksEnabled, lang, t, appendMessage, finishLastTool, startAssistant, appendAssistantDelta, finishStreaming]);
 
     const handleStop = useCallback(() => {
         if (abortRef.current) abortRef.current.abort();
@@ -154,6 +157,7 @@ const ChatPanel = ({vm, collapsed, onToggleCollapse}) => {
     return (
         <>
             <ChatPanelComponent
+                lang={lang}
                 collapsed={collapsed}
                 onToggleCollapse={onToggleCollapse}
                 messages={messages}
@@ -175,6 +179,7 @@ const ChatPanel = ({vm, collapsed, onToggleCollapse}) => {
             />
             {showDisclosure && (
                 <DisclosureModal
+                    lang={lang}
                     onAccept={() => {
                         localStorage.setItem(DISCLOSURE_STORAGE_KEY, '1');
                         setShowDisclosure(false);
@@ -183,6 +188,7 @@ const ChatPanel = ({vm, collapsed, onToggleCollapse}) => {
             )}
             {showModal && (
                 <ApiKeyModal
+                    lang={lang}
                     initialApiKey={apiKey}
                     initialDeepSeekApiKey={deepseekApiKey}
                     initialOpenAIApiKey={openaiApiKey}

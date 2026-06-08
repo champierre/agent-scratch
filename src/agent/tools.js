@@ -170,19 +170,47 @@ export const TOOLS = [
 ];
 
 // ツール入力の生成中(ストリーミング中)にUIへ出す進捗ラベル
-export const draftingLabel = name => {
-    switch (name) {
-    case 'set_scripts': return 'ブロックを書いています';
-    case 'add_sprite': return 'スプライトを選んでいます';
-    case 'search_library': return 'ライブラリを探しています';
-    case 'set_sprite_properties': return 'スプライトを配置しています';
-    case 'fetch_url': return 'ページを取得しています';
-    default: return '次の操作を準備しています';
-    }
+export const draftingLabel = (name, lang = 'ja') => {
+    const ja = {
+        set_scripts: 'ブロックを書いています',
+        add_sprite: 'スプライトを選んでいます',
+        search_library: 'ライブラリを探しています',
+        set_sprite_properties: 'スプライトを配置しています',
+        fetch_url: 'ページを取得しています',
+        default: '次の操作を準備しています'
+    };
+    const en = {
+        set_scripts: 'Writing blocks',
+        add_sprite: 'Picking a sprite',
+        search_library: 'Searching the library',
+        set_sprite_properties: 'Placing the sprite',
+        fetch_url: 'Fetching the page',
+        default: 'Preparing the next action'
+    };
+    const table = lang === 'en' ? en : ja;
+    return table[name] || table.default;
 };
 
 // チャットUIに表示するツール実行サマリ
-export const summarizeToolCall = (name, input) => {
+export const summarizeToolCall = (name, input, lang = 'ja') => {
+    if (lang === 'en') {
+        switch (name) {
+        case 'get_project_state': return 'Checking the project state';
+        case 'search_library': return `Library search: ${input.kind} "${input.query}"`;
+        case 'add_sprite': return `Add sprite: ${input.name}`;
+        case 'delete_sprite': return `Delete sprite: ${input.target}`;
+        case 'rename_sprite': return `Rename: ${input.target} → ${input.new_name}`;
+        case 'add_costume': return `Add costume: ${input.costume_name} → ${input.target}`;
+        case 'add_sound': return `Add sound: ${input.sound_name} → ${input.target}`;
+        case 'add_backdrop': return `Add backdrop: ${input.backdrop_name}`;
+        case 'set_scripts': return `Building blocks: ${input.target}`;
+        case 'set_sprite_properties': return `Set properties: ${input.target}`;
+        case 'start_project': return 'Run the project';
+        case 'stop_project': return 'Stop the project';
+        case 'fetch_url': return `Fetch URL: ${input.url}`;
+        default: return name;
+        }
+    }
     switch (name) {
     case 'get_project_state': return 'プロジェクトの状態を確認';
     case 'search_library': return `ライブラリ検索: ${input.kind} "${input.query}"`;
