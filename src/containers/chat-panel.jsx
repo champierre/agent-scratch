@@ -2,17 +2,20 @@ import React, {useCallback, useRef, useState} from 'react';
 import ChatPanelComponent from '../components/chat-panel/chat-panel.jsx';
 import ApiKeyModal from '../components/api-key-modal/api-key-modal.jsx';
 import DisclosureModal from '../components/disclosure-modal/disclosure-modal.jsx';
-import {runAgent, AuthError, getModel, setModel, isTrialAvailable, getDeepSeekApiKey, setDeepSeekApiKey, isDeepSeekModel, DEV_ANTHROPIC_KEY} from '../agent/agent-loop';
+import {runAgent, AuthError, getModel, setModel, isTrialAvailable, getDeepSeekApiKey, setDeepSeekApiKey, isDeepSeekModel, getOpenAIApiKey, setOpenAIApiKey, isOpenAIModel, getGeminiApiKey, setGeminiApiKey, isGeminiModel, DEV_ANTHROPIC_KEY} from '../agent/agent-loop';
+import {STRINGS, errorPrefix} from '../i18n';
 
 const STORAGE_KEY = 'agent-scratch-api-key';
-const COST_STORAGE_KEY = 'agent-scratch-total-cost';
 const DISCLOSURE_STORAGE_KEY = 'agent-scratch-disclosure-accepted';
 
-const ChatPanel = ({vm}) => {
+const ChatPanel = ({vm, lang = 'ja', collapsed, onToggleCollapse}) => {
+    const t = STRINGS[lang];
     const [messages, setMessages] = useState([]);
     const [running, setRunning] = useState(false);
     const [apiKey, setApiKey] = useState(() => localStorage.getItem(STORAGE_KEY) || DEV_ANTHROPIC_KEY || '');
     const [deepseekApiKey, setDeepseekApiKeyState] = useState(() => getDeepSeekApiKey());
+    const [openaiApiKey, setOpenaiApiKeyState] = useState(() => getOpenAIApiKey());
+    const [geminiApiKey, setGeminiApiKeyState] = useState(() => getGeminiApiKey());
     const [blocksEnabled, setBlocksEnabled] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [showDisclosure, setShowDisclosure] = useState(
@@ -20,10 +23,7 @@ const ChatPanel = ({vm}) => {
     );
     // ツール入力生成中の進捗表示("ブロックを書いています (1200文字)" など)
     const [drafting, setDrafting] = useState(null);
-    const [sessionCost, setSessionCost] = useState(0);
-    const [totalCost, setTotalCost] = useState(
-        () => parseFloat(localStorage.getItem(COST_STORAGE_KEY)) || 0
-    );
+    const [currentModel, setCurrentModel] = useState(() => getModel());
 
     // Anthropic API 形式の会話履歴(マルチターン対応)
     const apiMessagesRef = useRef([]);
@@ -59,13 +59,17 @@ const ChatPanel = ({vm}) => {
         setMessages(prev => prev.map(m => (m.streaming ? {...m, streaming: false} : m)));
     }, []);
 
-    // 直近の実行中ツール表示を done/error に更新する
-    const finishLastTool = useCallback(ok => {
+    // 直近の実行中ツール表示を done/error に更新する(エラー時は詳細も保持)
+    const finishLastTool = useCallback((ok, detail) => {
         setMessages(prev => {
             const next = [...prev];
             for (let i = next.length - 1; i >= 0; i--) {
                 if (next[i].role === 'tool' && next[i].status === 'running') {
-                    next[i] = {...next[i], status: ok ? 'done' : 'error'};
+                    next[i] = {
+                        ...next[i],
+                        status: ok ? 'done' : 'error',
+                        ...(detail ? {detail} : {})
+                    };
                     break;
                 }
             }
@@ -73,20 +77,16 @@ const ChatPanel = ({vm}) => {
         });
     }, []);
 
-    const handleUsage = useCallback(cost => {
-        setSessionCost(prev => prev + cost);
-        setTotalCost(prev => {
-            const next = prev + cost;
-            localStorage.setItem(COST_STORAGE_KEY, String(next));
-            return next;
-        });
-    }, []);
-
-    const handleSend = useCallback(async text => {
+    const handleSend = useCallback(async (text, opts = {}) => {
         if (!vm) {
-            appendMessage({role: 'error', text: 'Scratch エディタの読み込みが完了していません。'});
+            appendMessage({role: 'error', text: t.vmNotReady});
             return;
         }
+        // 通常送信では子が表示中の値を明示する。サジェスト等で一時的に
+        // 無効化する場合は forceBlocksDisabled を優先する。
+        const effectiveBlocksEnabled = opts.forceBlocksDisabled ?
+            false :
+            (typeof opts.blocksEnabled === 'boolean' ? opts.blocksEnabled : blocksEnabled);
         appendMessage({role: 'user', text});
         setRunning(true);
         const controller = new AbortController();
@@ -98,7 +98,8 @@ const ChatPanel = ({vm}) => {
                 userText: text,
                 apiMessages: apiMessagesRef.current,
                 signal: controller.signal,
-                blocksEnabled,
+                blocksEnabled: effectiveBlocksEnabled,
+                lang,
                 onAssistantStart: startAssistant,
                 onAssistantDelta: appendAssistantDelta,
                 onAssistantText: t => appendMessage({role: 'assistant', text: t}),
@@ -106,20 +107,19 @@ const ChatPanel = ({vm}) => {
                     setDrafting(null);
                     appendMessage({role: 'tool', text: summary, status: 'running'});
                 },
-                onToolEnd: ok => finishLastTool(ok),
+                onToolEnd: (ok, detail) => finishLastTool(ok, detail),
                 onToolDrafting: (label, chars) => {
                     setDrafting(label ? {label, chars} : null);
-                },
-                onUsage: handleUsage
+                }
             });
         } catch (e) {
             if (e instanceof AuthError) {
-                appendMessage({role: 'error', text: 'APIキーが無効です。設定し直してください。'});
+                appendMessage({role: 'error', text: t.authInvalid});
                 setShowModal(true);
             } else if (e.name === 'AbortError' || controller.signal.aborted) {
-                appendMessage({role: 'assistant', text: '(停止しました)'});
+                appendMessage({role: 'assistant', text: t.stopped});
             } else {
-                appendMessage({role: 'error', text: `エラー: ${e.message}`});
+                appendMessage({role: 'error', text: errorPrefix(lang, e.message)});
             }
         } finally {
             setRunning(false);
@@ -127,41 +127,59 @@ const ChatPanel = ({vm}) => {
             finishStreaming();
             abortRef.current = null;
         }
-    }, [vm, apiKey, blocksEnabled, appendMessage, finishLastTool, handleUsage, startAssistant, appendAssistantDelta, finishStreaming]);
+    }, [vm, apiKey, blocksEnabled, lang, t, appendMessage, finishLastTool, startAssistant, appendAssistantDelta, finishStreaming]);
 
     const handleStop = useCallback(() => {
         if (abortRef.current) abortRef.current.abort();
     }, []);
 
-    const handleSaveApiKey = useCallback((key, model, dsKey) => {
+    const handleSaveApiKey = useCallback((key, model, dsKey, oaKey, gemKey) => {
         localStorage.setItem(STORAGE_KEY, key);
         setApiKey(key);
-        if (model) setModel(model);
+        if (model) { setModel(model); setCurrentModel(model); }
         if (dsKey !== undefined) {
             setDeepSeekApiKey(dsKey);
             setDeepseekApiKeyState(dsKey);
         }
+        if (oaKey !== undefined) {
+            setOpenAIApiKey(oaKey);
+            setOpenaiApiKeyState(oaKey);
+        }
+        if (gemKey !== undefined) {
+            setGeminiApiKey(gemKey);
+            setGeminiApiKeyState(gemKey);
+        }
         setShowModal(false);
     }, []);
+
+    const trialModeNow = !apiKey && !deepseekApiKey && !openaiApiKey && !geminiApiKey && isTrialAvailable();
 
     return (
         <>
             <ChatPanelComponent
+                lang={lang}
+                collapsed={collapsed}
+                onToggleCollapse={onToggleCollapse}
                 messages={messages}
                 running={running}
                 drafting={drafting}
-                hasApiKey={isDeepSeekModel(getModel()) ? !!deepseekApiKey : !!apiKey}
-                trialMode={!apiKey && !deepseekApiKey && isTrialAvailable()}
-                sessionCost={sessionCost}
-                totalCost={totalCost}
-                blocksEnabled={blocksEnabled}
+                hasApiKey={
+                    isDeepSeekModel(getModel()) ? !!deepseekApiKey :
+                        isOpenAIModel(getModel()) ? !!openaiApiKey :
+                            isGeminiModel(getModel()) ? !!geminiApiKey : !!apiKey
+                }
+                trialMode={trialModeNow}
+                currentModel={currentModel}
+                blocksEnabled={trialModeNow ? false : blocksEnabled}
                 onSend={handleSend}
                 onStop={handleStop}
                 onOpenSettings={() => setShowModal(true)}
                 onToggleBlocks={() => setBlocksEnabled(v => !v)}
+                onSetBlocksEnabled={v => setBlocksEnabled(v)}
             />
             {showDisclosure && (
                 <DisclosureModal
+                    lang={lang}
                     onAccept={() => {
                         localStorage.setItem(DISCLOSURE_STORAGE_KEY, '1');
                         setShowDisclosure(false);
@@ -170,8 +188,11 @@ const ChatPanel = ({vm}) => {
             )}
             {showModal && (
                 <ApiKeyModal
+                    lang={lang}
                     initialApiKey={apiKey}
                     initialDeepSeekApiKey={deepseekApiKey}
+                    initialOpenAIApiKey={openaiApiKey}
+                    initialGeminiApiKey={geminiApiKey}
                     initialModel={getModel()}
                     onSave={handleSaveApiKey}
                     onClose={() => setShowModal(false)}

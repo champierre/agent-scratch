@@ -5,7 +5,7 @@
 Scratch エディタに組み込まれた AI エージェント。ユーザーの自然言語指示から Scratch プロジェクトを自動生成する。
 
 - **フロントエンド**: React + webpack、Scratch GUI を組み込み
-- **AI**: Anthropic Claude API / DeepSeek API（OpenAI 互換）
+- **AI**: Anthropic Claude API / DeepSeek API / OpenAI API / Google Gemini API（Anthropic 以外は OpenAI 互換ループを共用。Gemini は generativelanguage.googleapis.com の OpenAI 互換エンドポイント）
 - **試用モード**: Cloudflare Worker プロキシ経由（DeepSeek deepseek-chat）
 - **デプロイ**: GitHub Pages（`npm run build` → `build/` ディレクトリ）
 
@@ -17,7 +17,7 @@ npm install
 npm start              # http://localhost:8602/
 ```
 
-`.env` に `DEV_DEEPSEEK_API_KEY` または `DEV_ANTHROPIC_API_KEY` を設定するとブラウザへの手動入力が不要になる。本番ビルドにはキーは含まれない。
+`.env` に `DEV_DEEPSEEK_API_KEY`・`DEV_ANTHROPIC_API_KEY`・`DEV_OPENAI_API_KEY`・`DEV_GEMINI_API_KEY` を設定するとブラウザへの手動入力が不要になる。本番ビルドにはキーは含まれない。
 
 ## ブランチ・PRルール
 
@@ -26,12 +26,33 @@ npm start              # http://localhost:8602/
 - マージ済みの PR のブランチには push しない。新しいブランチを切って PR を作る
 - ブランチ命名: `feat/`, `fix/`, `refactor/` などのプレフィックスを使う
 
+## 設計方針
+
+### ロジックで確実に(システムプロンプト頼みにしない)
+
+AI の挙動はシステムプロンプトの指示だけに頼るとランダム性が残る。**強制できることはアルゴリズム(コード)で強制する**こと。
+
+- 守らせたい制約は、プロンプトのお願いではなく検証・変換・ガードで担保する。例:
+  - メニュー/フィールドの許可値・アセット実在チェック → `block-builder` で検証しエラーで自己修正させる(`block-specs` の `values` / `dynamic`)
+  - 1回のブロック数上限 → `set_scripts` で物理的に制限
+  - 日本語クエリ → `library-search` で英語へ自動変換
+  - `blocksEnabled=false` → ツール除外 + プロンプト + ハンドラ ToolError の3重ガード
+- プロンプトに残すのは、生成内容そのもの(文体・説明の構成など)アルゴリズム化できないものだけ。
+- **UI 状態の二重管理を避ける**。同じ値を state と ref / localStorage に二重に持つと「表示はオンなのに実際はオフ」のようなズレが起きる。単一の真実(source of truth)を1つに決め、送信時の値は引数で明示的に渡す(state 更新の非同期性に依存しない)。
+
 ## アーキテクチャ
+
+### 多言語対応 (`src/i18n.js`)
+
+- **UI と AI レスポンスの言語は Scratch の言語(`vm.getLocale()`)に追従する**。`localeToLang()` で日本語系(`ja` / `ja-Hira`)→ `'ja'`、それ以外 → `'en'` に畳む。判定の単一の真実は `vm.getLocale()` で、`app.jsx` の `useScratchLang` がポーリングして `lang` を配る(VM は locale 変更イベントを出さないため)。
+- **UI 文言を変更・追加するときは、必ず日英の両方(`STRINGS.ja` と `STRINGS.en`)を更新する**。片方だけ追加すると英語UIに日本語が混ざる/`undefined` が出る。`test/i18n.test.js` が両言語のキー集合一致を検証しているので、ハードコードの日本語を直接 JSX に書かず必ず `STRINGS[lang]` 経由にすること。ツール進捗ラベル(`tools.js` の `draftingLabel`/`summarizeToolCall`)・システムプロンプト(`system-prompt.js` の `SYSTEM_PROMPT_JA`/`SYSTEM_PROMPT_EN`)・エラーメッセージ(`agent-loop.js`)も同様に両言語を用意する。
+- **AI レスポンス言語はプロンプトのお願いではなく、`lang` でシステムプロンプト本体を日英で差し替えて担保する**(「ロジックで確実に」)。`runAgent({lang})` → `getSystemPrompt(lang)` / `getBlockOperationPrompt(blocksEnabled, lang)`。
 
 ### エージェントループ (`src/agent/agent-loop.js`)
 
-- Anthropic と DeepSeek で別のループ実装（`runDeepSeekAgent` / Anthropic ループ）
-- 会話履歴は **Anthropic 形式** で統一管理し、DeepSeek に渡す際に OpenAI 形式に変換
+- Anthropic ループと OpenAI 互換ループ（`runOpenAICompatAgent`）の2実装。DeepSeek と OpenAI(GPT) は互換ループを共用
+- 会話履歴は **Anthropic 形式** で統一管理し、OpenAI 互換 API に渡す際に変換
+- GPT-5系は `max_tokens` 非対応のため `max_completion_tokens` を使用。ストリーミングの usage 取得は `stream_options: {include_usage: true}` でオプトイン
 - `blocksEnabled=false` のとき:
   1. ツールリストから `set_scripts` を除外
   2. システムプロンプトにブロック操作禁止の制約を追加
@@ -47,6 +68,7 @@ npm start              # http://localhost:8602/
 - AI の返答中の opcode（`looks_hide` 等）を scratchblocks SVG に変換
 - ブラウザ言語が `ja` の場合は日本語ラベルで表示
 - 日本語ラベルは `src/agent/block-labels.js` の `JA` オブジェクトで管理
+- AI が opcode でなく日本語名(「ずっと」等)で書いた場合も、カギ括弧内の文字列を `findOpcodeByJaName`(JA ラベルからの自動生成逆引き+エイリアス)で解決してブロック画像化する。よくある言い換えは `JA_NAME_ALIASES` に追加する
 - **重要**: 日本語ラベルは scratchblocks ロケールファイル（`locales/ja.json`）の文字列と正確に一致させること。`@greenFlag`、`@turnRight` などのアイコン参照も含める
 
 ### システムプロンプト (`src/agent/system-prompt.js`)
@@ -65,7 +87,7 @@ npm start              # http://localhost:8602/
 ## よくあるハマりポイント
 
 ### React `useCallback` の依存配列
-state を使うコールバックは依存配列に忘れずに追加する。`blocksEnabled` を追加し忘れるとトグルが効かない。
+state を使うコールバックは依存配列に忘れずに追加する。`blocksEnabled` を追加し忘れるとトグルが効かない。依存配列の遅延を避けるために ref で二重持ちするのは禁止(state とズレてバグる)。`handleSend` は `blocksEnabled` を依存配列に入れて state を直読みし、一時的な無効化は `onSend(text, {forceBlocksDisabled})` のように引数で渡す。
 
 ### scratchblocks の日本語ロケール
 `loadLanguages` で登録しても、テキストがロケールファイルの文字列と完全一致しないと色が正しく割り当てられない。`ja.json` の値をそのまま使い、`%1` を `(10)` などに置き換える。
@@ -89,3 +111,9 @@ state を使うコールバックは依存配列に忘れずに追加する。`b
 ```
 
 Python の websocket-client でページ操作・スクリーンショット取得が可能。ただしヘッドレス Chrome は WebGL 非対応のため Scratch のステージ描画は崩れる。ブロック画像（scratchblocks SVG）の確認は可能。
+
+### 自動テスト（`npm test`）
+重いテストランナー（jest/vitest）は使わず、**esbuild でバンドル → node 実行**方式で統一している。
+
+- ロジック: `test/block-builder.test.js`, `test/block-labels.test.js`, `test/static-checks.js`
+- React コンポーネント: `test/chat-panel-ui.test.js` を `tools/run-ui-test.mjs` 経由で実行（jsdom + `@testing-library/react`）。`scratchblocks`(UMD)と CSS はテストに不要なのでランナー内の esbuild plugin / 空ローダーで stub する。UI 挙動（折りたたみ等）のリグレッションはここに追加する。

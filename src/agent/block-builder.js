@@ -119,7 +119,7 @@ const buildBlock = (def, blocks, ctx, path) => {
         if (typeof value === 'object') {
             throw new BuildError(`${path}.fields.${name}: フィールドにはブロックを入れられません(文字列を指定してください)`);
         }
-        block.fields[name] = buildField(name, fieldSpec, String(value), ctx);
+        block.fields[name] = buildField(name, fieldSpec, String(value), ctx, `${path}.fields.${name}`);
     }
 
     // C型ブロックの内包スタック
@@ -152,6 +152,19 @@ const buildBlock = (def, blocks, ctx, path) => {
     return id;
 };
 
+// 選択値の検証(values: 静的許可値 / dynamic: VM由来の許可値カテゴリ)
+// dynamic 指定があるのに ctx.dynamicValues が無い場合(VMなしのテスト等)は検証しない
+const validateChoice = (spec, value, ctx, path, what) => {
+    if (!spec.values && !spec.dynamic) return;
+    if (spec.dynamic && !ctx.dynamicValues) return;
+    const dynamicList = (spec.dynamic && ctx.dynamicValues && ctx.dynamicValues[spec.dynamic]) || [];
+    const allowed = [...(spec.values || []), ...dynamicList];
+    if (allowed.includes(String(value))) return;
+    throw new BuildError(
+        `${path}: ${what} に "${value}" は使えません。使える値: ` +
+        allowed.map(v => `"${v}"`).join(', '));
+};
+
 // 1つのinput(リテラルshadow / メニューshadow / ネストブロック)を構築
 const buildInput = (name, argType, value, parentId, blocks, ctx, path) => {
     // boolean入力: ネストブロックのみ、shadowなし
@@ -172,6 +185,9 @@ const buildInput = (name, argType, value, parentId, blocks, ctx, path) => {
         const menuValue = isNested || value === undefined || value === null ?
             argType.default :
             String(value);
+        if (!isNested) {
+            validateChoice(argType, menuValue, ctx, path, name);
+        }
         const shadowId = uid();
         blocks[shadowId] = {
             id: shadowId,
@@ -224,6 +240,10 @@ const buildInput = (name, argType, value, parentId, blocks, ctx, path) => {
     }
     const isNested = isBlockDef(value);
     const shadowValue = isNested || value === undefined || value === null ? '' : String(value);
+    if (argType === 'color' && !isNested && shadowValue !== '' &&
+        !/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(shadowValue)) {
+        throw new BuildError(`${path}: 色は "#rrggbb" 形式で指定してください(例: "#ff0000")`);
+    }
     const shadowId = uid();
     blocks[shadowId] = {
         id: shadowId,
@@ -260,11 +280,12 @@ const buildReporter = (def, parentId, blocks, ctx, path, requireBoolean) => {
 };
 
 // フィールド値を構築(変数系はid解決)
-const buildField = (name, fieldSpec, value, ctx) => {
+const buildField = (name, fieldSpec, value, ctx, path) => {
     if (fieldSpec.variable !== undefined) {
         const variable = ctx.resolveVariable(value, fieldSpec.variable);
         return {name, value: variable.name, id: variable.id, variableType: fieldSpec.variable};
     }
+    validateChoice(fieldSpec, value, ctx, path || '', name);
     return {name, value};
 };
 

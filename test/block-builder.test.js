@@ -103,4 +103,51 @@ expectError(
     'ハットブロック', 'hatが途中');
 console.log('test4 OK: バリデーションエラー');
 
+// --- テスト5: メニュー/フィールド値の検証 ---
+expectError(
+    [{blocks: [{opcode: 'event_whenkeypressed', fields: {KEY_OPTION: 'スペース'}}]}],
+    '使えません', '不正なキー名');
+expectError(
+    [{blocks: [{opcode: 'control_stop', fields: {STOP_OPTION: 'stop all'}}]}],
+    '使えません', '不正なSTOP_OPTION');
+// dynamic付きメニューはVM情報(dynamicValues)が無ければ検証スキップ(スプライト名かもしれないため)
+buildScripts([{blocks: [{opcode: 'event_whenflagclicked'}, {opcode: 'motion_goto', inputs: {TO: 'random'}}]}], {resolveVariable});
+// 正しい値は通る
+buildScripts([{blocks: [
+    {opcode: 'event_whenkeypressed', fields: {KEY_OPTION: 'space'}},
+    {opcode: 'motion_goto', inputs: {TO: '_mouse_'}},
+    {opcode: 'control_stop', fields: {STOP_OPTION: 'all'}}
+]}], {resolveVariable});
+// dynamicValues を渡すと実在チェックされる
+const dynCtx = {resolveVariable, dynamicValues: {sprites: ['Ball'], costumes: ['costume1'], sounds: ['Meow'], backdrops: ['backdrop1']}};
+buildScripts([{blocks: [
+    {opcode: 'event_whenflagclicked'},
+    {opcode: 'looks_switchcostumeto', inputs: {COSTUME: 'costume1'}},
+    {opcode: 'sound_play', inputs: {SOUND_MENU: 'Meow'}},
+    {opcode: 'control_if', inputs: {CONDITION: {opcode: 'sensing_touchingobject', inputs: {TOUCHINGOBJECTMENU: 'Ball'}}}, substack: []}
+]}], dynCtx);
+try {
+    buildScripts([{blocks: [{opcode: 'event_whenflagclicked'}, {opcode: 'looks_switchcostumeto', inputs: {COSTUME: 'costume99'}}]}], dynCtx);
+    assert.fail('実在しないコスチュームはエラーになるべき');
+} catch (e) {
+    assert.ok(e.message.includes('costume1'), '許可値一覧つきエラー: ' + e.message);
+}
+try {
+    buildScripts([{blocks: [{opcode: 'event_whenflagclicked'}, {opcode: 'motion_goto', inputs: {TO: 'random'}}]}], dynCtx);
+    assert.fail('dynamicValuesありなら不正なgoto先はエラーになるべき');
+} catch (e) {
+    assert.ok(e.message.includes('使えません'), e.message);
+}
+console.log('test5 OK: メニュー/フィールド値の検証(静的+動的)');
+
+// --- テスト6: 色形式の検証 ---
+expectError(
+    [{blocks: [{opcode: 'event_whenflagclicked'}, {opcode: 'pen_setPenColorToColor', inputs: {COLOR: 'red'}}]}],
+    '#rrggbb', '色名はエラー');
+buildScripts([{blocks: [
+    {opcode: 'event_whenflagclicked'},
+    {opcode: 'pen_setPenColorToColor', inputs: {COLOR: '#ff0000'}}
+]}], {resolveVariable});
+console.log('test6 OK: 色形式の検証');
+
 console.log('ALL TESTS PASSED');

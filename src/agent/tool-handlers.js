@@ -7,6 +7,43 @@ import {
     searchBackdrops, findBackdropByName
 } from './library-search';
 
+// fetch_url ツール用のプロキシベース URL(試用モードと同じ Worker を兼用)
+const WORKER_BASE_URL = (() => {
+    const raw = process.env.TRIAL_PROXY_URL || '';
+    return raw.replace(/\/(v1\/)?chat\/completions$/, '').replace(/\/$/, '');
+})();
+
+const TRIAL_TOKEN_KEY = 'agent-scratch-trial-token';
+const getTrialToken = () => localStorage.getItem(TRIAL_TOKEN_KEY) || '';
+
+// 直接 fetch の取得上限(コンテキスト溢れ防止)
+const FETCH_URL_MAX_CHARS = 200 * 1024;
+
+// GitHub の URL を CORS 許可のある取得先に変換する(該当しなければ null)
+// - github.com/{o}/{r}/blob/{branch}/{path} → raw.githubusercontent.com
+// - github.com/{o}/{r} (リポジトリルート) → api.github.com の README(raw)
+export const toCorsFetchable = url => {
+    const blob = url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\/([^/]+)\/(.+)$/);
+    if (blob) {
+        return {url: `https://raw.githubusercontent.com/${blob[1]}/${blob[2]}/${blob[3]}/${blob[4]}`};
+    }
+    const root = url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+?)\/?$/);
+    if (root) {
+        return {
+            url: `https://api.github.com/repos/${root[1]}/${root[2]}/readme`,
+            headers: {Accept: 'application/vnd.github.raw+json'}
+        };
+    }
+    if (url.startsWith('https://raw.githubusercontent.com/') ||
+        url.startsWith('https://api.github.com/')) {
+        return {url};
+    }
+    return null;
+};
+
+// set_scripts 1回で組めるブロック数の上限(段階的な構築を強制)
+const MAX_BLOCKS_PER_CALL = 50;
+
 export class ToolError extends Error {}
 
 // name または id でターゲット(スプライト/ステージ)を探す
@@ -65,6 +102,10 @@ const targetSummary = target => {
     return summary;
 };
 
+const blockGuard = blocksEnabled => {
+    if (!blocksEnabled) throw new ToolError('ブロック操作は現在オフになっています。');
+};
+
 export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
 
     get_project_state: () => ({
@@ -85,6 +126,7 @@ export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
     },
 
     add_sprite: async ({name}) => {
+        blockGuard(blocksEnabled);
         const item = findSpriteByName(name);
         if (!item) {
             const candidates = searchSprites(name, 5).map(s => s.name);
@@ -102,6 +144,7 @@ export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
     },
 
     delete_sprite: ({target}) => {
+        blockGuard(blocksEnabled);
         const t = findTarget(vm, target);
         if (t.isStage) throw new ToolError('ステージは削除できません');
         vm.deleteSprite(t.id);
@@ -109,6 +152,7 @@ export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
     },
 
     rename_sprite: ({target, new_name}) => {
+        blockGuard(blocksEnabled);
         const t = findTarget(vm, target);
         if (t.isStage) throw new ToolError('ステージの名前は変更できません');
         vm.renameSprite(t.id, new_name);
@@ -116,6 +160,7 @@ export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
     },
 
     add_costume: async ({target, costume_name}) => {
+        blockGuard(blocksEnabled);
         const t = findTarget(vm, target);
         const item = findCostumeByName(costume_name);
         if (!item) {
@@ -130,6 +175,7 @@ export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
     },
 
     add_sound: async ({target, sound_name}) => {
+        blockGuard(blocksEnabled);
         const t = findTarget(vm, target);
         const item = findSoundByName(sound_name);
         if (!item) {
@@ -143,6 +189,7 @@ export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
     },
 
     add_backdrop: async ({backdrop_name}) => {
+        blockGuard(blocksEnabled);
         const item = findBackdropByName(backdrop_name);
         if (!item) {
             const candidates = searchBackdrops(backdrop_name, 5).map(b => b.name);
@@ -154,10 +201,8 @@ export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
         return {added: backdrop_name};
     },
 
-    set_scripts: async ({target, scripts}) => {
-        if (!blocksEnabled) {
-            throw new ToolError('ブロック操作は現在オフになっています。');
-        }
+    set_scripts: async ({target, scripts, append}) => {
+        blockGuard(blocksEnabled);
         const t = findTarget(vm, target);
         const resolveVariable = makeVariableResolver(vm, t);
 
@@ -169,16 +214,49 @@ export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
             await vm.extensionManager.loadExtensionURL('pen');
         }
 
+        // メニュー/フィールドの動的許可値(実在するスプライト名・コスチューム名など)
+        const stage = vm.runtime.getTargetForStage();
+        const dynamicValues = {
+            sprites: vm.runtime.targets
+                .filter(x => x.isOriginal && !x.isStage)
+                .map(x => x.getName()),
+            costumes: t.getCostumes().map(c => c.name),
+            sounds: t.getSounds().map(snd => snd.name),
+            backdrops: stage ? stage.getCostumes().map(c => c.name) : []
+        };
+
         // 失敗時ロールバック用スナップショット
         const blocksSnapshot = {...t.blocks._blocks};
         const scriptsSnapshot = [...t.blocks._scripts];
         try {
-            const newBlocks = buildScripts(scripts, {resolveVariable});
+            const newBlocks = buildScripts(scripts, {resolveVariable, dynamicValues});
+
+            // 一度に組める量を制限(巨大スクリプトの一括生成を防ぎ、段階的な構築を強制する)
+            const realCount = Object.values(newBlocks).filter(b => !b.shadow).length;
+            if (realCount > MAX_BLOCKS_PER_CALL) {
+                throw new ToolError(
+                    `一度に組むブロックが多すぎます(${realCount}個 / 上限${MAX_BLOCKS_PER_CALL}個)。` +
+                    'スクリプトを分けて、2回目以降は append: true で追加してください');
+            }
+
             // 旧ブロックを参照する実行中スレッドを止めてから差し替える
             // (残っていると _updateGlows が消えたブロックIDを光らせようとして
             //  "Tried to glow block that does not exist" が毎フレーム発生する)
             vm.runtime.stopForTarget(t);
-            t.blocks.deleteAllBlocks();
+            if (append) {
+                // 既存スクリプトの下に新しいスクリプトを配置する
+                const existingTops = t.blocks.getScripts()
+                    .map(id => t.blocks.getBlock(id))
+                    .filter(Boolean);
+                const offsetY = existingTops.length
+                    ? Math.max(...existingTops.map(b => b.y || 0)) + 320
+                    : 0;
+                for (const block of Object.values(newBlocks)) {
+                    if (block.topLevel) block.y = (block.y || 0) + offsetY;
+                }
+            } else {
+                t.blocks.deleteAllBlocks();
+            }
             for (const block of Object.values(newBlocks)) {
                 t.blocks.createBlock(block);
             }
@@ -187,7 +265,7 @@ export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
             vm.setEditingTarget(t.id);
             vm.emitWorkspaceUpdate();
             const scriptCount = t.blocks.getScripts().length;
-            return {ok: true, target: t.getName(), script_count: scriptCount};
+            return {ok: true, target: t.getName(), appended: !!append, script_count: scriptCount};
         } catch (e) {
             t.blocks._blocks = blocksSnapshot;
             t.blocks._scripts = scriptsSnapshot;
@@ -198,6 +276,7 @@ export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
     },
 
     set_sprite_properties: ({target, x, y, size, direction, visible}) => {
+        blockGuard(blocksEnabled);
         const t = findTarget(vm, target);
         if (t.isStage) throw new ToolError('ステージには位置などのプロパティを設定できません');
         if (typeof x === 'number' || typeof y === 'number') {
@@ -210,12 +289,64 @@ export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
     },
 
     start_project: () => {
+        blockGuard(blocksEnabled);
         vm.greenFlag();
         return {ok: true, message: '緑の旗を押しました(プロジェクト実行中)'};
     },
 
     stop_project: () => {
+        blockGuard(blocksEnabled);
         vm.stopAll();
         return {ok: true};
+    },
+
+    fetch_url: async ({url}) => {
+        if (!url) throw new ToolError('url が必要です');
+
+        // GitHub の URL は CORS 許可のあるエンドポイントに変換してブラウザから直接取得する
+        // (Worker プロキシはお試しトークンが必要なため、自分のキーのユーザーでも動くように)
+        const direct = toCorsFetchable(url);
+        const token = getTrialToken();
+        const useProxy = !direct && WORKER_BASE_URL && token;
+
+        let endpoint;
+        let headers;
+        if (direct) {
+            endpoint = direct.url;
+            headers = direct.headers;
+        } else if (useProxy) {
+            // GitHub 以外の URL はプロキシ経由(お試しトークンがある場合のみ)
+            endpoint = `${WORKER_BASE_URL}/fetch-url?url=${encodeURIComponent(url)}`;
+            headers = {Authorization: `Bearer ${token}`};
+        } else {
+            // 直接 fetch を試す(CORS許可のあるサイトなら成功する)
+            endpoint = url;
+        }
+
+        let res;
+        try {
+            res = await fetch(endpoint, headers ? {headers} : undefined);
+        } catch (e) {
+            throw new ToolError(
+                `ネットワークエラー: ${e.message}` +
+                (direct || useProxy ? '' : '(このサイトはブラウザから直接取得できない可能性があります)'));
+        }
+        if (!res.ok) {
+            let errMsg = `HTTP ${res.status}`;
+            try { const body = await res.json(); errMsg = body.error || errMsg; } catch { /* ignore */ }
+            throw new ToolError(`取得失敗: ${errMsg} (${endpoint})`);
+        }
+        let data;
+        if (useProxy) {
+            data = await res.json();
+        } else {
+            const text = (await res.text()).slice(0, FETCH_URL_MAX_CHARS);
+            data = {text, truncated: text.length >= FETCH_URL_MAX_CHARS};
+        }
+        return {
+            url,
+            text: data.text,
+            truncated: data.truncated || false
+        };
     }
 });

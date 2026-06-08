@@ -5,7 +5,7 @@
   "scripts": {
     "start": "webpack serve --mode development",
     "build": "webpack --mode production",
-    "test": "node test/static-checks.js && esbuild test/block-builder.test.js --bundle --platform=node --format=cjs --outfile=.tmp-test.cjs --log-level=error && node .tmp-test.cjs && rm .tmp-test.cjs"
+    "test": "node test/static-checks.js && esbuild test/block-builder.test.js --bundle --platform=node --format=cjs --outfile=.tmp-test.cjs --log-level=error && node .tmp-test.cjs && rm .tmp-test.cjs && esbuild test/block-labels.test.js --bundle --platform=node --format=cjs --outfile=.tmp-test2.cjs --log-level=error && node .tmp-test2.cjs && rm .tmp-test2.cjs && esbuild test/block-operation-prompt.test.js --bundle --platform=node --format=cjs --outfile=.tmp-test3.cjs --log-level=error && node .tmp-test3.cjs && rm .tmp-test3.cjs && esbuild test/i18n.test.js --bundle --platform=node --format=cjs --outfile=.tmp-test4.cjs --log-level=error && node .tmp-test4.cjs && rm .tmp-test4.cjs && node tools/run-ui-test.mjs test/chat-panel-ui.test.js && node tools/run-ui-test.mjs test/chat-panel-toggle.test.js"
   },
   "license": "AGPL-3.0-only",
   "dependencies": {
@@ -22,6 +22,7 @@
     "@babel/core": "^7.29.7",
     "@babel/preset-env": "^7.29.7",
     "@babel/preset-react": "^7.29.7",
+    "@testing-library/react": "^14.3.1",
     "babel-loader": "^10.1.1",
     "copy-webpack-plugin": "^14.0.0",
     "css-loader": "^7.1.4",

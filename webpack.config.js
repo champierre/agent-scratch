@@ -73,7 +73,9 @@ module.exports = (env, argv) => ({
         new webpack.DefinePlugin({
             'process.env.TRIAL_PROXY_URL': JSON.stringify(process.env.TRIAL_PROXY_URL || ''),
             'process.env.DEV_ANTHROPIC_API_KEY': JSON.stringify(process.env.DEV_ANTHROPIC_API_KEY || ''),
-            'process.env.DEV_DEEPSEEK_API_KEY': JSON.stringify(process.env.DEV_DEEPSEEK_API_KEY || '')
+            'process.env.DEV_DEEPSEEK_API_KEY': JSON.stringify(process.env.DEV_DEEPSEEK_API_KEY || ''),
+            'process.env.DEV_OPENAI_API_KEY': JSON.stringify(process.env.DEV_OPENAI_API_KEY || ''),
+            'process.env.DEV_GEMINI_API_KEY': JSON.stringify(process.env.DEV_GEMINI_API_KEY || '')
         }),
         new HtmlWebpackPlugin({
             template: 'src/index.html',

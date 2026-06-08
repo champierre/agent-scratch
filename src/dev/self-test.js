@@ -35,8 +35,7 @@ export const maybeRunAgentTest = vm => {
                     if (label && (chars === 0 || chars % 1000 < 30)) {
                         console.log('[agenttest] drafting:', label, chars);
                     }
-                },
-                onUsage: cost => console.log('[agenttest] usage cost: $' + cost.toFixed(5))
+                }
             });
             console.log('[agenttest] PASSED. deltas:', deltaCount, 'elapsed:', Date.now() - startedAt, 'ms');
         } catch (e) {

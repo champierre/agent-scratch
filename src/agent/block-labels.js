@@ -308,3 +308,75 @@ export const getBlockLabel = (opcode, lang) => {
     }
     return EN[opcode];
 };
+
+// ---- 日本語ブロック名 → opcode の逆引き ----
+// AI が opcode でなく日本語名(「ずっと」「10歩動かす」等)でブロックに言及した
+// 場合でもブロック画像に変換できるよう、JA ラベルから逆引き辞書を自動生成する。
+// (システムプロンプトの「opcodeで書く」指示が守られないモデルへのロジック側の救済)
+
+// 表記ゆれの吸収: アイコン参照・引数プレースホルダ・数字・空白・句読点を除去
+const normalizeJaName = s => String(s)
+    .replace(/@\w+/g, '')          // @greenFlag 等のアイコン参照
+    .replace(/\[[^\]]*\]/g, '')    // [スペース v] 等のメニュー
+    .replace(/\([^)]*\)/g, '')     // (10) 等の引数
+    .replace(/[0-9０-９]+/g, '')   // ラベル外に書かれた数値(「10歩動かす」等)
+    .replace(/[\s　、。，．,.!?！？「」『』:：;；・〜~ー-]/g, '')
+    .toLowerCase();
+
+// モデルが書きがちな言い換え(正規化後のJAラベルと一致しない表現)
+const JA_NAME_ALIASES = {
+    '緑の旗がクリックされたとき': 'event_whenflagclicked',
+    '旗がクリックされたとき': 'event_whenflagclicked',
+    '緑の旗が押されたとき': 'event_whenflagclicked',
+    'スペースキーが押されたとき': 'event_whenkeypressed',
+    'もし端についたら跳ね返る': 'motion_ifonedgebounce',
+    '端についたら跳ね返る': 'motion_ifonedgebounce',
+    '端に着いたら跳ね返る': 'motion_ifonedgebounce',
+    'ずっと繰り返す': 'control_forever',
+    'クローンされたとき': 'control_start_as_clone',
+    '自分自身のクローンを作る': 'control_create_clone_of'
+};
+
+const JA_NAME_TO_OPCODE = (() => {
+    const map = {};
+    // エイリアスを優先登録
+    for (const [name, opcode] of Object.entries(JA_NAME_ALIASES)) {
+        map[normalizeJaName(name)] = opcode;
+    }
+    // JAラベルから自動生成(先勝ち)
+    for (const [opcode, label] of Object.entries(JA)) {
+        const key = normalizeJaName(label);
+        if (key.length >= 2 && !map[key]) map[key] = opcode;
+    }
+    return map;
+})();
+
+// 日本語のブロック名らしき文字列から opcode を引く(該当なしは null)
+export const findOpcodeByJaName = text => {
+    const key = normalizeJaName(text);
+    return (key && JA_NAME_TO_OPCODE[key]) || null;
+};
+
+// key が cand の部分列(順序を保って含まれる)か
+// 例: 「回転方法をにする」⊂「回転方法を左右に反転にする」(メニュー値の挿入を許容)
+const isSubsequence = (key, cand) => {
+    let i = 0;
+    for (const ch of cand) {
+        if (ch === key[i]) i++;
+        if (i === key.length) return true;
+    }
+    return i === key.length;
+};
+
+// 「ブロック画像の直後の括弧書き」が同じブロックの言い換えかを判定する。
+// 画像+(同じ日本語名)の二重表示を省くために使う。
+export const isRedundantJaAnnotation = (text, opcode) => {
+    if (findOpcodeByJaName(text) === opcode) return true;
+    const label = JA[opcode];
+    if (!label) return false;
+    const key = normalizeJaName(label);
+    const cand = normalizeJaName(text);
+    if (!key || !cand || key.length < 3) return false;
+    if (cand.length > key.length * 3 + 10) return false; // 長すぎる説明文は別物とみなす
+    return isSubsequence(key, cand);
+};
