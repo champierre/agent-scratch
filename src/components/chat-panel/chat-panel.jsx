@@ -4,17 +4,14 @@ import jaLocale from 'scratchblocks/locales/ja.json';
 import jaHiraLocale from 'scratchblocks/locales/ja-Hira.json';
 import {BLOCK_LABELS, getBlockLabel, findOpcodeByJaName, isRedundantJaAnnotation} from '../../agent/block-labels.js';
 import {isDeepSeekModel, isOpenAIModel, isGeminiModel} from '../../agent/agent-loop';
+import {STRINGS, SUGGESTIONS_BY_LANG, draftingChars, pricingLabel} from '../../i18n';
 import './chat-panel.css';
 
 // 日本語ロケールを登録
 scratchblocks.loadLanguages({'ja': jaLocale, 'ja-Hira': jaHiraLocale});
 
-// ブラウザの言語設定からscratchblocksに渡すlanguagesを決定
-const getSbLanguages = () => {
-    const lang = (navigator.language || 'en').toLowerCase();
-    if (lang.startsWith('ja')) return ['ja', 'en'];
-    return ['en'];
-};
+// Scratch の言語(ja|en)から scratchblocks に渡す languages を決定
+const getSbLanguages = lang => (lang === 'ja' ? ['ja', 'en'] : ['en']);
 
 // opcode を scratchblocks SVG に変換するコンポーネント
 //
@@ -32,20 +29,20 @@ const OPCODE_RE = new RegExp(
     })(?![A-Za-z0-9_])`,
     'g'
 );
-const SB_LANGUAGES = getSbLanguages();
 
-const BlockImage = ({opcode, keyStr}) => {
+const BlockImage = ({opcode, keyStr, lang = 'ja'}) => {
     const ref = useRef(null);
-    const lang = navigator.language || 'en';
-    const label = getBlockLabel(opcode, lang);
+    // scratchblocks のロケールは ja のとき日本語、それ以外は英語ラベル
+    const sbLang = lang === 'ja' ? 'ja' : 'en';
+    const label = getBlockLabel(opcode, sbLang);
 
     useEffect(() => {
         if (!ref.current || !label) return;
         ref.current.innerHTML = '';
-        const doc = scratchblocks.parse(label, {inline: true, languages: SB_LANGUAGES});
+        const doc = scratchblocks.parse(label, {inline: true, languages: getSbLanguages(lang)});
         const svg = scratchblocks.render(doc, {style: 'scratch3', scale: 0.65});
         ref.current.appendChild(svg);
-    }, [label]);
+    }, [label, lang]);
 
     // フック呼び出しの後で early return する(Reactのフック順序を守る)
     if (!label) return <code key={keyStr}>{opcode}</code>;
@@ -73,7 +70,7 @@ const skipRedundantAnnotation = (text, pos, opcode) => {
     return pos;
 };
 
-const renderJaQuotedBlocks = (text, keyPrefix) => {
+const renderJaQuotedBlocks = (text, keyPrefix, lang) => {
     const parts = [];
     let last = 0;
     let match;
@@ -82,7 +79,7 @@ const renderJaQuotedBlocks = (text, keyPrefix) => {
         const opcode = findOpcodeByJaName(match[1]);
         if (!opcode) continue;
         if (match.index > last) parts.push(text.slice(last, match.index));
-        parts.push(<BlockImage key={`${keyPrefix}-ja-${match.index}`} opcode={opcode} keyStr={`${keyPrefix}-ja-${match.index}`} />);
+        parts.push(<BlockImage key={`${keyPrefix}-ja-${match.index}`} opcode={opcode} keyStr={`${keyPrefix}-ja-${match.index}`} lang={lang} />);
         last = skipRedundantAnnotation(text, match.index + match[0].length, opcode);
         JA_QUOTED_RE.lastIndex = last;
     }
@@ -90,7 +87,7 @@ const renderJaQuotedBlocks = (text, keyPrefix) => {
     return parts.length > 0 ? parts : [text];
 };
 
-const renderWithBlocks = (text, keyPrefix) => {
+const renderWithBlocks = (text, keyPrefix, lang) => {
     const parts = [];
     let last = 0;
     let match;
@@ -98,38 +95,38 @@ const renderWithBlocks = (text, keyPrefix) => {
     while ((match = OPCODE_RE.exec(text)) !== null) {
         const opcode = match[1];
         if (!BLOCK_LABELS[opcode]) continue;
-        if (match.index > last) parts.push(...renderJaQuotedBlocks(text.slice(last, match.index), `${keyPrefix}-${last}`));
-        parts.push(<BlockImage key={`${keyPrefix}-blk-${match.index}`} opcode={opcode} keyStr={`${keyPrefix}-${match.index}`} />);
+        if (match.index > last) parts.push(...renderJaQuotedBlocks(text.slice(last, match.index), `${keyPrefix}-${last}`, lang));
+        parts.push(<BlockImage key={`${keyPrefix}-blk-${match.index}`} opcode={opcode} keyStr={`${keyPrefix}-${match.index}`} lang={lang} />);
         last = skipRedundantAnnotation(text, match.index + match[0].length, opcode);
         OPCODE_RE.lastIndex = last;
     }
-    if (last < text.length) parts.push(...renderJaQuotedBlocks(text.slice(last), `${keyPrefix}-${last}`));
+    if (last < text.length) parts.push(...renderJaQuotedBlocks(text.slice(last), `${keyPrefix}-${last}`, lang));
     return parts.length > 0 ? parts : [text];
 };
 
 // 行内マークダウン(**太字** と `コード`) + opcode ブロック画像 をReact要素に変換
-const renderInline = (text, keyPrefix) => {
+const renderInline = (text, keyPrefix, lang) => {
     const parts = [];
     text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).forEach((seg, i) => {
         if (/^\*\*[^*]+\*\*$/.test(seg)) {
-            parts.push(<strong key={`${keyPrefix}-${i}`}>{renderWithBlocks(seg.slice(2, -2), `${keyPrefix}-${i}`)}</strong>);
+            parts.push(<strong key={`${keyPrefix}-${i}`}>{renderWithBlocks(seg.slice(2, -2), `${keyPrefix}-${i}`, lang)}</strong>);
         } else if (/^`[^`]+`$/.test(seg)) {
             // バッククォート内は opcode として扱いブロック画像に変換
             const inner = seg.slice(1, -1);
             if (BLOCK_LABELS[inner]) {
-                parts.push(<BlockImage key={`${keyPrefix}-${i}`} opcode={inner} keyStr={`${keyPrefix}-${i}`} />);
+                parts.push(<BlockImage key={`${keyPrefix}-${i}`} opcode={inner} keyStr={`${keyPrefix}-${i}`} lang={lang} />);
             } else {
                 parts.push(<code key={`${keyPrefix}-${i}`}>{inner}</code>);
             }
         } else if (seg) {
-            parts.push(...renderWithBlocks(seg, `${keyPrefix}-${i}`));
+            parts.push(...renderWithBlocks(seg, `${keyPrefix}-${i}`, lang));
         }
     });
     return parts;
 };
 
 // 行単位のブロック要素(見出し・リスト・区切り線・コードブロック)も処理するマークダウン描画
-const renderMarkdownLite = text => {
+const renderMarkdownLite = (text, lang) => {
     // コードブロック(```...```)を先に分割し、その中はプレーンテキストとして扱う
     const segments = text.split(/(```[\s\S]*?```)/g);
     const result = [];
@@ -167,14 +164,14 @@ const renderMarkdownLite = text => {
 
             if (h2) {
                 flushList();
-                result.push(<strong key={key} style={{display: 'block', fontSize: '14px', marginTop: '6px'}}>{renderInline(h2[1], key)}</strong>);
+                result.push(<strong key={key} style={{display: 'block', fontSize: '14px', marginTop: '6px'}}>{renderInline(h2[1], key, lang)}</strong>);
             } else if (h3) {
                 flushList();
-                result.push(<strong key={key} style={{display: 'block', marginTop: '4px'}}>{renderInline(h3[1], key)}</strong>);
+                result.push(<strong key={key} style={{display: 'block', marginTop: '4px'}}>{renderInline(h3[1], key, lang)}</strong>);
             } else if (li) {
-                listItems.push(<li key={key}>{renderInline(li[1], key)}</li>);
+                listItems.push(<li key={key}>{renderInline(li[1], key, lang)}</li>);
             } else if (ol) {
-                listItems.push(<li key={key}>{renderInline(ol[1], key)}</li>);
+                listItems.push(<li key={key}>{renderInline(ol[1], key, lang)}</li>);
             } else if (hr) {
                 flushList();
                 result.push(<hr key={key} style={{border: 'none', borderTop: '1px solid #ddd', margin: '6px 0'}} />);
@@ -183,7 +180,7 @@ const renderMarkdownLite = text => {
                 if (line === '') {
                     result.push(<br key={key} />);
                 } else {
-                    result.push(<span key={key} style={{display: 'block'}}>{renderInline(line, key)}</span>);
+                    result.push(<span key={key} style={{display: 'block'}}>{renderInline(line, key, lang)}</span>);
                 }
             }
         });
@@ -194,7 +191,8 @@ const renderMarkdownLite = text => {
 };
 
 // ツール行(エラー時はクリックで詳細を開閉し、コピーできる)
-const ToolRow = ({message}) => {
+const ToolRow = ({message, lang = 'ja'}) => {
+    const t = STRINGS[lang];
     const [expanded, setExpanded] = useState(false);
     const [copied, setCopied] = useState(false);
     const hasDetail = message.status === 'error' && message.detail;
@@ -211,7 +209,7 @@ const ToolRow = ({message}) => {
         <div className="as-chat-tool-wrap">
             <div
                 className={`as-chat-message as-chat-tool${hasDetail ? ' as-chat-tool-clickable' : ''}`}
-                title={hasDetail ? 'クリックでエラー内容を表示' : undefined}
+                title={hasDetail ? t.toolErrorTitle : undefined}
                 onClick={hasDetail ? () => setExpanded(v => !v) : undefined}
             >
                 <span className="as-chat-tool-icon">🔧</span>
@@ -224,7 +222,7 @@ const ToolRow = ({message}) => {
                 <div className="as-chat-tool-detail">
                     <pre className="as-chat-tool-detail-text">{message.detail}</pre>
                     <button className="as-chat-tool-copy" onClick={copyDetail}>
-                        {copied ? 'コピーしました ✓' : 'コピー'}
+                        {copied ? t.toolCopied : t.toolCopy}
                     </button>
                 </div>
             )}
@@ -232,9 +230,9 @@ const ToolRow = ({message}) => {
     );
 };
 
-const MessageRow = ({message}) => {
+const MessageRow = ({message, lang = 'ja'}) => {
     if (message.role === 'tool') {
-        return <ToolRow message={message} />;
+        return <ToolRow message={message} lang={lang} />;
     }
     if (message.role === 'error') {
         return <div className="as-chat-message as-chat-error">{message.text}</div>;
@@ -242,7 +240,7 @@ const MessageRow = ({message}) => {
     if (message.role === 'assistant') {
         return (
             <div className="as-chat-message as-chat-assistant">
-                {renderMarkdownLite(message.text)}
+                {renderMarkdownLite(message.text, lang)}
             </div>
         );
     }
@@ -268,23 +266,19 @@ const pricingPageFor = model => {
 };
 
 // 応答待ちインジケータ(ツール入力の生成中はその進捗を表示)
-const ThinkingRow = ({drafting}) => (
+const ThinkingRow = ({drafting, lang = 'ja'}) => (
     <div className="as-chat-message as-chat-tool">
         <span className="as-chat-tool-spinner" />
         <span className="as-chat-tool-text">
             {drafting ?
-                `${drafting.label}...${drafting.chars > 0 ? ` (${drafting.chars}文字)` : ''}` :
-                '考え中...'}
+                `${drafting.label}...${draftingChars(lang, drafting.chars)}` :
+                STRINGS[lang].thinking}
         </span>
     </div>
 );
 
-const SUGGESTIONS = [
-    {label: 'ネコ逃げゲームを教えて', text: 'https://github.com/champierre/nekonige で紹介しているネコ逃げゲームの作り方を教えて', disableBlocks: true},
-    {label: 'ネコを動かして', text: 'ネコが旗をクリックしたら右に動き続けるようにして'}
-];
-
 const ChatPanel = ({
+    lang = 'ja',
     collapsed,
     onToggleCollapse,
     messages,
@@ -300,6 +294,8 @@ const ChatPanel = ({
     onToggleBlocks,
     onSetBlocksEnabled
 }) => {
+    const t = STRINGS[lang];
+    const SUGGESTIONS = SUGGESTIONS_BY_LANG[lang];
     const canSend = hasApiKey || trialMode;
     const [input, setInput] = useState('');
     const historyRef = useRef(null);
@@ -362,50 +358,50 @@ const ChatPanel = ({
             <div className="as-chat-header">
                 <button
                     className="as-chat-collapse-button"
-                    title="AI アシスタントを閉じる"
+                    title={t.closeAssistant}
                     onClick={onToggleCollapse}
                 >▶</button>
-                <span className="as-chat-title">AI アシスタント</span>
+                <span className="as-chat-title">{t.headerTitle}</span>
                 <button
                     className="as-chat-settings-button"
-                    title="APIキー設定"
+                    title={t.settings}
                     onClick={onOpenSettings}
                 >⚙️</button>
             </div>
             <div className="as-chat-history" ref={historyRef}>
                 {messages.length === 0 && (
                     <div className="as-chat-placeholder">
-                        作りたいものを日本語で指示してください。<br />
-                        例:「ネコが旗をクリックしたら右に動き続けるようにして」
+                        {t.placeholderLine1}<br />
+                        {t.placeholderExample}
                     </div>
                 )}
-                {messages.map((m, i) => <MessageRow key={i} message={m} />)}
-                {showThinking && <ThinkingRow drafting={drafting} />}
+                {messages.map((m, i) => <MessageRow key={i} message={m} lang={lang} />)}
+                {showThinking && <ThinkingRow drafting={drafting} lang={lang} />}
             </div>
             <div className="as-chat-input-area">
                 {currentModel && (
                     <div className="as-chat-cost">
                         <span style={{marginRight: '6px', opacity: 0.7}}>[{currentModel}]</span>
                         <a href={pricingPageFor(currentModel).url} target="_blank" rel="noreferrer">
-                            {pricingPageFor(currentModel).label} の料金表(API利用料)
+                            {pricingLabel(lang, pricingPageFor(currentModel).label)}
                         </a>
                     </div>
                 )}
                 {trialMode && (
                     <div className="as-chat-trial" onClick={onOpenSettings}>
-                        🎁 お試しモードで利用中(DeepSeek V3・制限あり)。⚙️ から自分の API キーを設定できます
+                        {t.trialBanner}
                     </div>
                 )}
                 {!canSend && (
                     <div className="as-chat-no-key" onClick={onOpenSettings}>
-                        ⚙️ をクリックして API キーを設定してください
+                        {t.noKey}
                     </div>
                 )}
                 <div
                     className="as-chat-toggle-row"
-                    title={trialMode ? 'お試しモードではブロック操作は使えません。⚙️ から自分の API キーを設定すると使えます' : undefined}
+                    title={trialMode ? t.toggleDisabledTitle : undefined}
                 >
-                    <span className="as-chat-toggle-desc">ブロック操作</span>
+                    <span className="as-chat-toggle-desc">{t.toggleBlocks}</span>
                     <span
                         className={`as-chat-toggle-switch${!trialMode && blocksEnabled ? ' as-chat-toggle-on' : ''}${trialMode ? ' as-chat-toggle-disabled' : ''}`}
                         onClick={trialMode ? undefined : onToggleBlocks}
@@ -416,7 +412,7 @@ const ChatPanel = ({
                 <textarea
                     className="as-chat-input"
                     value={input}
-                    placeholder="指示を入力..."
+                    placeholder={t.inputPlaceholder}
                     rows={5}
                     disabled={!canSend}
                     onChange={e => setInput(e.target.value)}
@@ -444,7 +440,7 @@ const ChatPanel = ({
                 )}
                 {running ? (
                     <button className="as-chat-button as-chat-stop" onClick={onStop}>
-                        ■ 停止
+                        {t.stop}
                     </button>
                 ) : (
                     <button
@@ -452,7 +448,7 @@ const ChatPanel = ({
                         disabled={!canSend || !input.trim()}
                         onClick={submit}
                     >
-                        送信
+                        {t.send}
                     </button>
                 )}
             </div>
