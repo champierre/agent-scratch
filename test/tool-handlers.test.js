@@ -83,6 +83,20 @@ const makeVm = () => {
     assert.strictEqual(Object.values(state.stage._vars).length, 1, '重複作成されない');
 }
 
+// --- テスト4b: 作成後にツールボックス(パレット)が再描画される ---
+{
+    const {vm} = makeVm();
+    let rerenders = 0;
+    const fakeWorkspace = {getToolbox: () => ({forceRerender: () => { rerenders++; }})};
+    const handlers = createToolHandlers(vm, {
+        blocksEnabled: true,
+        getWorkspace: () => fakeWorkspace
+    });
+    handlers.create_variable({name: 'aaa'});
+    assert.strictEqual(rerenders, 1, '変数作成後に forceRerender が呼ばれる');
+    // 既存(created:false)でも再描画しても害はないが、新規作成時に呼ばれることを保証する
+}
+
 // --- テスト5: blocksEnabled=false では ToolError ---
 {
     const {vm} = makeVm();

@@ -106,7 +106,22 @@ const blockGuard = blocksEnabled => {
     if (!blocksEnabled) throw new ToolError('ブロック操作は現在オフになっています。');
 };
 
-export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
+// 変数/リスト作成後にブロックパレット(連続ツールボックスのフライアウト)を再構築する。
+// emitWorkspaceUpdate だけでは Blockly の変数マップは更新されるがパレットは再描画されず、
+// 作った変数のブロックが「変数」カテゴリに現れない。編集中ワークスペースのツールボックスを
+// forceRerender して「変数を作る」ボタンと同じ結果にする(「ロジックで確実に」)。
+// getWorkspace は GUI 層から注入される(src/lib/editor-workspace.js の getEditorWorkspace)。
+// テストや getWorkspace 未注入時は no-op(変数は VM 上に作成済みなので害はない)。
+const refreshToolbox = getWorkspace => {
+    if (typeof getWorkspace !== 'function') return;
+    try {
+        const ws = getWorkspace();
+        const toolbox = ws && ws.getToolbox && ws.getToolbox();
+        if (toolbox && toolbox.forceRerender) toolbox.forceRerender();
+    } catch { /* パレット更新の失敗はツール結果に影響させない */ }
+};
+
+export const createToolHandlers = (vm, {blocksEnabled = true, getWorkspace} = {}) => ({
 
     get_project_state: () => ({
         targets: vm.runtime.targets
@@ -292,7 +307,8 @@ export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
                 scope: t.isStage ? 'global' : t.getName(), note: '同名が既にあります'};
         }
         t.createVariable(uid(), name, type);
-        vm.emitWorkspaceUpdate();   // 変数パレットを更新(set_scripts と同様)
+        vm.emitWorkspaceUpdate();      // VM の変数を Blockly の変数マップへ同期
+        refreshToolbox(getWorkspace);  // パレット(フライアウト)を再構築して変数ブロックを表示
         return {ok: true, created: true, name, kind: kindName,
             scope: t.isStage ? 'global' : t.getName()};
     },

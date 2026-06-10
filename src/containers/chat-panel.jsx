@@ -4,6 +4,7 @@ import ApiKeyModal from '../components/api-key-modal/api-key-modal.jsx';
 import DisclosureModal from '../components/disclosure-modal/disclosure-modal.jsx';
 import {runAgent, AuthError, getModel, setModel, isTrialAvailable, getDeepSeekApiKey, setDeepSeekApiKey, isDeepSeekModel, getOpenAIApiKey, setOpenAIApiKey, isOpenAIModel, getGeminiApiKey, setGeminiApiKey, isGeminiModel, DEV_ANTHROPIC_KEY} from '../agent/agent-loop';
 import {STRINGS, errorPrefix} from '../i18n';
+import {getEditorWorkspace} from '../lib/editor-workspace';
 
 const STORAGE_KEY = 'agent-scratch-api-key';
 const DISCLOSURE_STORAGE_KEY = 'agent-scratch-disclosure-accepted';
@@ -100,6 +101,9 @@ const ChatPanel = ({vm, lang = 'ja', collapsed, onToggleCollapse}) => {
                 signal: controller.signal,
                 blocksEnabled: effectiveBlocksEnabled,
                 lang,
+                // 変数/リスト作成後にブロックパレットを再描画するため、編集中の
+                // Blockly ワークスペースを取得する関数を渡す(tool-handlers が利用)
+                getWorkspace: getEditorWorkspace,
                 onAssistantStart: startAssistant,
                 onAssistantDelta: appendAssistantDelta,
                 onAssistantText: t => appendMessage({role: 'assistant', text: t}),
