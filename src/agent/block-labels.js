@@ -68,12 +68,12 @@ const EN = {
 
     // ---- 制御 ----
     control_wait: 'wait (1) seconds',
-    control_repeat: 'repeat (10)',
-    control_forever: 'forever',
-    control_if: 'if <> then',
-    control_if_else: 'if <> then {} else',
+    control_repeat: 'repeat (10)\n\nend',
+    control_forever: 'forever\n\nend',
+    control_if: 'if <> then\n\nend',
+    control_if_else: 'if <> then\n\nelse\n\nend',
     control_wait_until: 'wait until <>',
-    control_repeat_until: 'repeat until <>',
+    control_repeat_until: 'repeat until <>\n\nend',
     control_stop: 'stop [all v]',
     control_start_as_clone: 'when I start as a clone',
     control_create_clone_of: 'create clone of [myself v]',
@@ -217,12 +217,12 @@ const JA = {
 
     // ---- 制御 ----
     control_wait: '(1) 秒待つ',
-    control_repeat: '(10) 回繰り返す',
-    control_forever: 'ずっと',
-    control_if: 'もし <> なら',
-    control_if_else: 'もし <> なら {} でなければ',
+    control_repeat: '(10) 回繰り返す\n\nend',
+    control_forever: 'ずっと\n\nend',
+    control_if: 'もし <> なら\n\nend',
+    control_if_else: 'もし <> なら\n\nでなければ\n\nend',
     control_wait_until: '<> まで待つ',
-    control_repeat_until: '<> まで繰り返す',
+    control_repeat_until: '<> まで繰り返す\n\nend',
     control_stop: ' [すべてを止める v]',
     control_start_as_clone: 'クローンされたとき',
     control_create_clone_of: '[自分自身 v] のクローンを作る',
@@ -343,9 +343,9 @@ const JA_NAME_TO_OPCODE = (() => {
     for (const [name, opcode] of Object.entries(JA_NAME_ALIASES)) {
         map[normalizeJaName(name)] = opcode;
     }
-    // JAラベルから自動生成(先勝ち)
+    // JAラベルから自動生成(先勝ち)。C字型ブロックは最初の行(ヘッダー)だけを使う
     for (const [opcode, label] of Object.entries(JA)) {
-        const key = normalizeJaName(label);
+        const key = normalizeJaName(label.split('\n')[0]);
         if (key.length >= 2 && !map[key]) map[key] = opcode;
     }
     return map;
