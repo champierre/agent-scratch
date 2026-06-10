@@ -100,11 +100,11 @@ export const pricingLabel = (lang, providerLabel) =>
 // サジェスト(例文ボタン)。en は日本語特有の題材(nekonige 等)を避けた汎用例。
 export const SUGGESTIONS_BY_LANG = {
     ja: [
-        {label: 'ネコ逃げゲームを教えて', text: 'https://github.com/champierre/nekonige で紹介しているネコ逃げゲームの作り方を教えて', disableBlocks: true},
-        {label: 'ネコを動かして', text: 'ネコが旗をクリックしたら右に動き続けるようにして'}
+        {label: 'ネコ逃げゲームを教えて', text: 'https://github.com/champierre/nekonige で紹介しているネコ逃げゲームの作り方を教えて', disableBlocks: true, modes: ['nav']},
+        {label: 'ネコを動かして', text: 'ネコが旗をクリックしたら右に動き続けるようにして', modes: ['nav', 'driver']}
     ],
     en: [
-        {label: 'Make the cat move', text: 'Make the cat move right continuously when the green flag is clicked'},
-        {label: 'Make a chase game', text: 'Make a simple game where the cat follows the mouse pointer'}
+        {label: 'Make the cat move', text: 'Make the cat move right continuously when the green flag is clicked', modes: ['nav', 'driver']},
+        {label: 'Make a chase game', text: 'Make a simple game where the cat follows the mouse pointer', modes: ['nav', 'driver']}
     ]
 };

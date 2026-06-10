@@ -258,6 +258,12 @@
     background: #e0d4f7;
 }
 
+.as-chat-suggestion-modes {
+    margin-left: 4px;
+    font-size: 11px;
+    opacity: 0.8;
+}
+
 .as-chat-tool-wrap {
     align-self: flex-start;
     max-width: 90%;

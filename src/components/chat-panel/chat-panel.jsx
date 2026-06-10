@@ -444,7 +444,15 @@ const ChatPanel = ({
                                     }
                                     onSend(s.text, {forceBlocksDisabled: !!s.disableBlocks});
                                 }}
-                            >{s.label}</button>
+                            >
+                                {s.label}
+                                {s.modes && (
+                                    <span className="as-chat-suggestion-modes">
+                                        {s.modes.includes('nav') && <span>🗺️</span>}
+                                        {s.modes.includes('driver') && <span>🎮</span>}
+                                    </span>
+                                )}
+                            </button>
                         ))}
                     </div>
                 )}
