@@ -35,14 +35,16 @@ const BlockImage = ({opcode, keyStr, lang = 'ja'}) => {
     // scratchblocks のロケールは ja のとき日本語、それ以外は英語ラベル
     const sbLang = lang === 'ja' ? 'ja' : 'en';
     const label = getBlockLabel(opcode, sbLang);
+    // 改行を含むC字型ブロック(if/repeat等)はinline: falseでレンダリングしないと一行になる
+    const isBlockShape = label ? label.includes('\n') : false;
 
     useEffect(() => {
         if (!ref.current || !label) return;
         ref.current.innerHTML = '';
-        const doc = scratchblocks.parse(label, {inline: true, languages: getSbLanguages(lang)});
+        const doc = scratchblocks.parse(label, {inline: !isBlockShape, languages: getSbLanguages(lang)});
         const svg = scratchblocks.render(doc, {style: 'scratch3', scale: 0.65});
         ref.current.appendChild(svg);
-    }, [label, lang]);
+    }, [label, lang, isBlockShape]);
 
     // フック呼び出しの後で early return する(Reactのフック順序を守る)
     if (!label) return <code key={keyStr}>{opcode}</code>;
@@ -50,7 +52,9 @@ const BlockImage = ({opcode, keyStr, lang = 'ja'}) => {
     return (
         <span
             ref={ref}
-            style={{display: 'inline-block', verticalAlign: 'middle', margin: '0 1px'}}
+            style={isBlockShape
+                ? {display: 'block', margin: '4px 0'}
+                : {display: 'inline-block', verticalAlign: 'middle', margin: '0 1px'}}
             title={opcode}
         />
     );
@@ -402,11 +406,17 @@ const ChatPanel = ({
                     title={trialMode ? t.toggleDisabledTitle : undefined}
                 >
                     <span className="as-chat-toggle-desc">{t.toggleBlocks}</span>
+                    <span className={`as-chat-mode-label${trialMode || !blocksEnabled ? ' as-chat-mode-active' : ''}`}>
+                        🗺️ {t.navMode}
+                    </span>
                     <span
                         className={`as-chat-toggle-switch${!trialMode && blocksEnabled ? ' as-chat-toggle-on' : ''}${trialMode ? ' as-chat-toggle-disabled' : ''}`}
                         onClick={trialMode ? undefined : onToggleBlocks}
                     >
                         <span className="as-chat-toggle-knob" />
+                    </span>
+                    <span className={`as-chat-mode-label${!trialMode && blocksEnabled ? ' as-chat-mode-active' : ''}`}>
+                        {t.driverMode} 🎮
                     </span>
                 </div>
                 <textarea
@@ -434,7 +444,15 @@ const ChatPanel = ({
                                     }
                                     onSend(s.text, {forceBlocksDisabled: !!s.disableBlocks});
                                 }}
-                            >{s.label}</button>
+                            >
+                                {s.label}
+                                {s.modes && (
+                                    <span className="as-chat-suggestion-modes">
+                                        {s.modes.includes('nav') && <span>🗺️</span>}
+                                        {s.modes.includes('driver') && <span>🎮</span>}
+                                    </span>
+                                )}
+                            </button>
                         ))}
                     </div>
                 )}
