@@ -106,7 +106,22 @@ const blockGuard = blocksEnabled => {
     if (!blocksEnabled) throw new ToolError('ブロック操作は現在オフになっています。');
 };
 
-export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
+// 変数/リスト作成後にブロックパレット(連続ツールボックスのフライアウト)を再構築する。
+// emitWorkspaceUpdate だけでは Blockly の変数マップは更新されるがパレットは再描画されず、
+// 作った変数のブロックが「変数」カテゴリに現れない。編集中ワークスペースのツールボックスを
+// forceRerender して「変数を作る」ボタンと同じ結果にする(「ロジックで確実に」)。
+// getWorkspace は GUI 層から注入される(src/lib/editor-workspace.js の getEditorWorkspace)。
+// テストや getWorkspace 未注入時は no-op(変数は VM 上に作成済みなので害はない)。
+const refreshToolbox = getWorkspace => {
+    if (typeof getWorkspace !== 'function') return;
+    try {
+        const ws = getWorkspace();
+        const toolbox = ws && ws.getToolbox && ws.getToolbox();
+        if (toolbox && toolbox.forceRerender) toolbox.forceRerender();
+    } catch { /* パレット更新の失敗はツール結果に影響させない */ }
+};
+
+export const createToolHandlers = (vm, {blocksEnabled = true, getWorkspace} = {}) => ({
 
     get_project_state: () => ({
         targets: vm.runtime.targets
@@ -273,6 +288,29 @@ export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
             if (e instanceof BuildError) throw new ToolError(e.message);
             throw e;
         }
+    },
+
+    // 変数/リストを単独で作成する(ブロックを組まずに作るとき)。
+    // set_scripts 経由の自動作成(makeVariableResolver)と同じ存在チェックで二重作成を防ぐ。
+    create_variable: ({name, kind, target}) => {
+        blockGuard(blocksEnabled);
+        if (!name) throw new ToolError('name が必要です');
+        const type = kind === 'list' ? 'list' : '';   // '' = 変数, 'list' = リスト
+        // target 省略 or "Stage" → グローバル(ステージ)、スプライト名 → そのスプライトのローカル
+        const t = target ? findTarget(vm, target) : vm.runtime.getTargetForStage();
+        const stage = vm.runtime.getTargetForStage();
+        const existing = t.lookupVariableByNameAndType(name, type, false) ||
+            (!t.isStage && stage.lookupVariableByNameAndType(name, type, true));
+        const kindName = type === 'list' ? 'list' : 'variable';
+        if (existing) {
+            return {ok: true, created: false, name: existing.name, kind: kindName,
+                scope: t.isStage ? 'global' : t.getName(), note: '同名が既にあります'};
+        }
+        t.createVariable(uid(), name, type);
+        vm.emitWorkspaceUpdate();      // VM の変数を Blockly の変数マップへ同期
+        refreshToolbox(getWorkspace);  // パレット(フライアウト)を再構築して変数ブロックを表示
+        return {ok: true, created: true, name, kind: kindName,
+            scope: t.isStage ? 'global' : t.getName()};
     },
 
     set_sprite_properties: ({target, x, y, size, direction, visible}) => {

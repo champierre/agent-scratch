@@ -151,6 +151,7 @@ const runOpenAICompatAgent = async ({
     signal,
     blocksEnabled,
     lang = 'ja',
+    getWorkspace,
     onAssistantStart,
     onAssistantDelta,
     onAssistantText,
@@ -168,7 +169,7 @@ const runOpenAICompatAgent = async ({
         maxRetries: 2, // 503等の一時エラーに耐えるため(指数バックオフで自動再試行)
         ...(stripSdkHeaders ? {defaultHeaders: STRIP_STAINLESS_HEADERS} : {})
     });
-    const handlers = createToolHandlers(vm, {blocksEnabled});
+    const handlers = createToolHandlers(vm, {blocksEnabled, getWorkspace});
     const activeTools = blocksEnabled ? TOOLS : TOOLS.filter(t => !BLOCK_TOOL_NAMES.has(t.name));
     const oaiTools = toOpenAITools(activeTools);
     const systemMessages = [
@@ -315,6 +316,7 @@ export const runAgent = async ({
     signal,
     blocksEnabled = true,
     lang = 'ja',
+    getWorkspace,
     onAssistantStart,
     onAssistantDelta,
     onAssistantText,
@@ -332,7 +334,7 @@ export const runAgent = async ({
             baseURL: TRIAL_PROXY_URL,
             model: TRIAL_MODEL,
             // お試しモードはブロック操作不可(説明・解説モード固定)
-            vm, userText, apiMessages, signal, blocksEnabled: false, lang,
+            vm, userText, apiMessages, signal, blocksEnabled: false, lang, getWorkspace,
             onAssistantStart, onAssistantDelta, onAssistantText,
             onToolStart, onToolEnd, onToolDrafting
         });
@@ -343,7 +345,7 @@ export const runAgent = async ({
         const deepseekApiKey = getDeepSeekApiKey();
         if (!deepseekApiKey) throw new AuthError(lang === 'en' ? 'No DeepSeek API key is set. Please set it from ⚙️.' : 'DeepSeek APIキーが設定されていません。⚙️ から設定してください。');
         return runOpenAICompatAgent({
-            apiKey: deepseekApiKey, vm, userText, apiMessages, signal, blocksEnabled, lang,
+            apiKey: deepseekApiKey, vm, userText, apiMessages, signal, blocksEnabled, lang, getWorkspace,
             onAssistantStart, onAssistantDelta, onAssistantText,
             onToolStart, onToolEnd, onToolDrafting
         });
@@ -356,7 +358,7 @@ export const runAgent = async ({
         return runOpenAICompatAgent({
             apiKey: openaiApiKey,
             baseURL: 'https://api.openai.com/v1',
-            vm, userText, apiMessages, signal, blocksEnabled, lang,
+            vm, userText, apiMessages, signal, blocksEnabled, lang, getWorkspace,
             onAssistantStart, onAssistantDelta, onAssistantText,
             onToolStart, onToolEnd, onToolDrafting
         });
@@ -370,7 +372,7 @@ export const runAgent = async ({
             apiKey: geminiApiKey,
             baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai',
             stripSdkHeaders: true,
-            vm, userText, apiMessages, signal, blocksEnabled, lang,
+            vm, userText, apiMessages, signal, blocksEnabled, lang, getWorkspace,
             onAssistantStart, onAssistantDelta, onAssistantText,
             onToolStart, onToolEnd, onToolDrafting
         });
@@ -385,7 +387,7 @@ export const runAgent = async ({
         timeout: REQUEST_TIMEOUT_MS,
         maxRetries: 1
     });
-    const handlers = createToolHandlers(vm, {blocksEnabled});
+    const handlers = createToolHandlers(vm, {blocksEnabled, getWorkspace});
 
     // システムプロンプトとツール定義は固定 → prompt caching
     const system = [

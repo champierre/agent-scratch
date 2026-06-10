@@ -77,6 +77,7 @@ set_scripts の scripts は次の形式:
 - C型ブロックは "substack"(中身)、control_if_else はさらに "substack2"(else側)
 - 条件入力(boolean)には六角形ブロック({"opcode": "operator_equals", ...} 等)のみ
 - 変数・リスト・メッセージは名前を書くだけで自動作成される(グローバル変数になる)
+- ブロックを組まずに変数・リストだけを作りたいと頼まれたら create_variable を使う(kind で variable/list を選ぶ。target にスプライト名を渡すとそのスプライト専用、省略すると全スプライト用)
 - x, y はスクリプトのワークスペース上の座標(省略時は自動配置)
 - set_scripts は1回50ブロックまで(超えるとエラー)。大きな作品は分割し、2回目以降は append: true で既存スクリプトに追加する
 
@@ -154,6 +155,7 @@ The scripts argument of set_scripts uses this format:
 - C-shaped blocks take "substack" (the body); control_if_else also takes "substack2" (the else branch)
 - Boolean (condition) inputs accept only hexagonal blocks ({"opcode": "operator_equals", ...}, etc.)
 - Variables, lists, and messages are auto-created just by naming them (they become global variables)
+- If asked to create just a variable or list without building blocks, use create_variable (pick variable/list with kind; pass a sprite name as target for a sprite-local one, or omit it for a global one)
 - x, y are coordinates on the script workspace (auto-placed if omitted)
 - set_scripts allows up to 50 blocks per call (more errors out). Split large projects, and use append: true from the second call onward to add to existing scripts
 
