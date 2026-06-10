@@ -92,6 +92,23 @@ state を使うコールバックは依存配列に忘れずに追加する。`b
 ### scratchblocks の日本語ロケール
 `loadLanguages` で登録しても、テキストがロケールファイルの文字列と完全一致しないと色が正しく割り当てられない。`ja.json` の値をそのまま使い、`%1` を `(10)` などに置き換える。
 
+### scratchblocks の C字型ブロック（if/repeat等）
+`inline` オプション（`true`/`false`）だけでは C字型にならない。**ラベルの形式**が決め手。
+
+- `{}` 記法（例: `'if <> then {} else'`）→ `inline` に関わらず常に一行横並い（バグ）
+- 複数行DSL形式（例: `'if <> then\n\nelse\n\nend'`）+ `inline: false` → 正しいC字型
+
+C字型ブロックのラベルは必ず複数行形式で書く:
+```
+control_forever:      'ずっと\n\nend'
+control_if:           'もし <> なら\n\nend'
+control_if_else:      'もし <> なら\n\nでなければ\n\nend'
+control_repeat:       '(10) 回繰り返す\n\nend'
+control_repeat_until: '<> まで繰り返す\n\nend'
+```
+
+`findOpcodeByJaName` などラベルを逆引きする処理では `label.split('\n')[0]` で先頭行だけを使うこと（`end` や `でなければ` が混入すると一致しない）。
+
 ### ペン拡張のロード API
 - 正しい: `vm.extensionManager.isExtensionLoaded('pen')`
 - 誤り: `vm.runtime._extensions.isExtensionLoaded('pen')` → `_extensions` は存在しない
