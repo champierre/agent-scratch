@@ -26,6 +26,7 @@ export const BLOCK_TOOL_NAMES = new Set([
     'add_backdrop',
     'set_scripts',
     'set_sprite_properties',
+    'create_variable',
     'start_project',
     'stop_project'
 ]);
@@ -166,6 +167,19 @@ export const TOOLS = [
             },
             required: ['url']
         }
+    },
+    {
+        name: 'create_variable',
+        description: '変数またはリストを作成する(ブロックを組まずに単独で作る場合に使う)。set_scripts でブロックを組むときは名前を書くだけで自動作成されるので、このツールは「変数/リストだけ作って」と頼まれたときに使う。',
+        input_schema: {
+            type: 'object',
+            properties: {
+                name: {type: 'string', description: '変数/リストの名前'},
+                kind: {type: 'string', enum: ['variable', 'list'], description: '省略時は variable'},
+                target: {type: 'string', description: '省略 or "Stage" で全スプライト用(グローバル)、スプライト名でそのスプライト専用(ローカル)'}
+            },
+            required: ['name']
+        }
     }
 ];
 
@@ -176,6 +190,7 @@ export const draftingLabel = (name, lang = 'ja') => {
         add_sprite: 'スプライトを選んでいます',
         search_library: 'ライブラリを探しています',
         set_sprite_properties: 'スプライトを配置しています',
+        create_variable: '変数を作っています',
         fetch_url: 'ページを取得しています',
         default: '次の操作を準備しています'
     };
@@ -184,6 +199,7 @@ export const draftingLabel = (name, lang = 'ja') => {
         add_sprite: 'Picking a sprite',
         search_library: 'Searching the library',
         set_sprite_properties: 'Placing the sprite',
+        create_variable: 'Creating a variable',
         fetch_url: 'Fetching the page',
         default: 'Preparing the next action'
     };
@@ -205,6 +221,7 @@ export const summarizeToolCall = (name, input, lang = 'ja') => {
         case 'add_backdrop': return `Add backdrop: ${input.backdrop_name}`;
         case 'set_scripts': return `Building blocks: ${input.target}`;
         case 'set_sprite_properties': return `Set properties: ${input.target}`;
+        case 'create_variable': return `Create ${input.kind === 'list' ? 'list' : 'variable'}: ${input.name}`;
         case 'start_project': return 'Run the project';
         case 'stop_project': return 'Stop the project';
         case 'fetch_url': return `Fetch URL: ${input.url}`;
@@ -222,6 +239,7 @@ export const summarizeToolCall = (name, input, lang = 'ja') => {
     case 'add_backdrop': return `背景追加: ${input.backdrop_name}`;
     case 'set_scripts': return `ブロックを組む: ${input.target}`;
     case 'set_sprite_properties': return `プロパティ設定: ${input.target}`;
+    case 'create_variable': return `${input.kind === 'list' ? 'リスト' : '変数'}を作成: ${input.name}`;
     case 'start_project': return 'プロジェクトを実行';
     case 'stop_project': return 'プロジェクトを停止';
     case 'fetch_url': return `URLを取得: ${input.url}`;

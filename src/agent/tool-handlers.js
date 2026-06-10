@@ -275,6 +275,28 @@ export const createToolHandlers = (vm, {blocksEnabled = true} = {}) => ({
         }
     },
 
+    // 変数/リストを単独で作成する(ブロックを組まずに作るとき)。
+    // set_scripts 経由の自動作成(makeVariableResolver)と同じ存在チェックで二重作成を防ぐ。
+    create_variable: ({name, kind, target}) => {
+        blockGuard(blocksEnabled);
+        if (!name) throw new ToolError('name が必要です');
+        const type = kind === 'list' ? 'list' : '';   // '' = 変数, 'list' = リスト
+        // target 省略 or "Stage" → グローバル(ステージ)、スプライト名 → そのスプライトのローカル
+        const t = target ? findTarget(vm, target) : vm.runtime.getTargetForStage();
+        const stage = vm.runtime.getTargetForStage();
+        const existing = t.lookupVariableByNameAndType(name, type, false) ||
+            (!t.isStage && stage.lookupVariableByNameAndType(name, type, true));
+        const kindName = type === 'list' ? 'list' : 'variable';
+        if (existing) {
+            return {ok: true, created: false, name: existing.name, kind: kindName,
+                scope: t.isStage ? 'global' : t.getName(), note: '同名が既にあります'};
+        }
+        t.createVariable(uid(), name, type);
+        vm.emitWorkspaceUpdate();   // 変数パレットを更新(set_scripts と同様)
+        return {ok: true, created: true, name, kind: kindName,
+            scope: t.isStage ? 'global' : t.getName()};
+    },
+
     set_sprite_properties: ({target, x, y, size, direction, visible}) => {
         blockGuard(blocksEnabled);
         const t = findTarget(vm, target);
