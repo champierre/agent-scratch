@@ -406,11 +406,17 @@ const ChatPanel = ({
                     title={trialMode ? t.toggleDisabledTitle : undefined}
                 >
                     <span className="as-chat-toggle-desc">{t.toggleBlocks}</span>
+                    <span className={`as-chat-mode-label${trialMode || !blocksEnabled ? ' as-chat-mode-active' : ''}`}>
+                        🗺️ {t.navMode}
+                    </span>
                     <span
                         className={`as-chat-toggle-switch${!trialMode && blocksEnabled ? ' as-chat-toggle-on' : ''}${trialMode ? ' as-chat-toggle-disabled' : ''}`}
                         onClick={trialMode ? undefined : onToggleBlocks}
                     >
                         <span className="as-chat-toggle-knob" />
+                    </span>
+                    <span className={`as-chat-mode-label${!trialMode && blocksEnabled ? ' as-chat-mode-active' : ''}`}>
+                        {t.driverMode} 🎮
                     </span>
                 </div>
                 <textarea
@@ -438,7 +444,15 @@ const ChatPanel = ({
                                     }
                                     onSend(s.text, {forceBlocksDisabled: !!s.disableBlocks});
                                 }}
-                            >{s.label}</button>
+                            >
+                                {s.label}
+                                {s.modes && (
+                                    <span className="as-chat-suggestion-modes">
+                                        {s.modes.includes('nav') && <span>🗺️</span>}
+                                        {s.modes.includes('driver') && <span>🎮</span>}
+                                    </span>
+                                )}
+                            </button>
                         ))}
                     </div>
                 )}
