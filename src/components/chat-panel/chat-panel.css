@@ -41,6 +41,18 @@
     font-weight: bold;
 }
 
+.as-chat-mode-label {
+    opacity: 0.35;
+    font-size: 11px;
+    transition: opacity 0.2s;
+    white-space: nowrap;
+}
+
+.as-chat-mode-label.as-chat-mode-active {
+    opacity: 1;
+    font-weight: bold;
+}
+
 .as-chat-toggle-switch {
     position: relative;
     width: 32px;
