@@ -2,7 +2,7 @@ import React, {useCallback, useRef, useState} from 'react';
 import ChatPanelComponent from '../components/chat-panel/chat-panel.jsx';
 import ApiKeyModal from '../components/api-key-modal/api-key-modal.jsx';
 import DisclosureModal from '../components/disclosure-modal/disclosure-modal.jsx';
-import {runAgent, AuthError, getModel, setModel, isTrialAvailable, getDeepSeekApiKey, setDeepSeekApiKey, isDeepSeekModel, getOpenAIApiKey, setOpenAIApiKey, isOpenAIModel, getGeminiApiKey, setGeminiApiKey, isGeminiModel, DEV_ANTHROPIC_KEY} from '../agent/agent-loop';
+import {runAgent, AuthError, getModel, setModel, isTrialAvailable, getDeepSeekApiKey, setDeepSeekApiKey, isDeepSeekModel, getOpenAIApiKey, setOpenAIApiKey, isOpenAIModel, getGeminiApiKey, setGeminiApiKey, isGeminiModel, getLocalApiKey, setLocalApiKey, isLocalModel, DEV_ANTHROPIC_KEY} from '../agent/agent-loop';
 import {STRINGS, errorPrefix} from '../i18n';
 import {getEditorWorkspace} from '../lib/editor-workspace';
 
@@ -17,6 +17,7 @@ const ChatPanel = ({vm, lang = 'ja', collapsed, onToggleCollapse}) => {
     const [deepseekApiKey, setDeepseekApiKeyState] = useState(() => getDeepSeekApiKey());
     const [openaiApiKey, setOpenaiApiKeyState] = useState(() => getOpenAIApiKey());
     const [geminiApiKey, setGeminiApiKeyState] = useState(() => getGeminiApiKey());
+    const [localApiKey, setLocalApiKeyState] = useState(() => getLocalApiKey());
     const [blocksEnabled, setBlocksEnabled] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [showDisclosure, setShowDisclosure] = useState(
@@ -137,7 +138,7 @@ const ChatPanel = ({vm, lang = 'ja', collapsed, onToggleCollapse}) => {
         if (abortRef.current) abortRef.current.abort();
     }, []);
 
-    const handleSaveApiKey = useCallback((key, model, dsKey, oaKey, gemKey) => {
+    const handleSaveApiKey = useCallback((key, model, dsKey, oaKey, gemKey, localKey) => {
         localStorage.setItem(STORAGE_KEY, key);
         setApiKey(key);
         if (model) { setModel(model); setCurrentModel(model); }
@@ -153,10 +154,15 @@ const ChatPanel = ({vm, lang = 'ja', collapsed, onToggleCollapse}) => {
             setGeminiApiKey(gemKey);
             setGeminiApiKeyState(gemKey);
         }
+        if (localKey !== undefined) {
+            setLocalApiKey(localKey);
+            setLocalApiKeyState(localKey);
+        }
         setShowModal(false);
     }, []);
 
-    const trialModeNow = !apiKey && !deepseekApiKey && !openaiApiKey && !geminiApiKey && isTrialAvailable();
+    const trialModeNow = !apiKey && !deepseekApiKey && !openaiApiKey &&
+        !geminiApiKey && !localApiKey && isTrialAvailable();
 
     return (
         <>
@@ -170,7 +176,8 @@ const ChatPanel = ({vm, lang = 'ja', collapsed, onToggleCollapse}) => {
                 hasApiKey={
                     isDeepSeekModel(getModel()) ? !!deepseekApiKey :
                         isOpenAIModel(getModel()) ? !!openaiApiKey :
-                            isGeminiModel(getModel()) ? !!geminiApiKey : !!apiKey
+                            isGeminiModel(getModel()) ? !!geminiApiKey :
+                                isLocalModel(getModel()) ? !!localApiKey : !!apiKey
                 }
                 trialMode={trialModeNow}
                 currentModel={currentModel}
@@ -197,6 +204,7 @@ const ChatPanel = ({vm, lang = 'ja', collapsed, onToggleCollapse}) => {
                     initialDeepSeekApiKey={deepseekApiKey}
                     initialOpenAIApiKey={openaiApiKey}
                     initialGeminiApiKey={geminiApiKey}
+                    initialLocalApiKey={localApiKey}
                     initialModel={getModel()}
                     onSave={handleSaveApiKey}
                     onClose={() => setShowModal(false)}
