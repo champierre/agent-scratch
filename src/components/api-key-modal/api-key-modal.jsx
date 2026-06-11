@@ -1,5 +1,5 @@
 import React, {useState} from 'react';
-import {isDeepSeekModel, isOpenAIModel, isGeminiModel} from '../../agent/agent-loop';
+import {isDeepSeekModel, isOpenAIModel, isGeminiModel, isLocalModel, LOCAL_MODEL} from '../../agent/agent-loop';
 import {STRINGS} from '../../i18n';
 import './api-key-modal.css';
 
@@ -15,29 +15,33 @@ const MODELS = [
     {id: 'gpt-5-nano', name: 'GPT-5 nano', note: {ja: '(最速・最安)', en: '(fastest, cheapest)'}, provider: 'openai'},
     {id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', note: {ja: '(高性能)', en: '(high performance)'}, provider: 'gemini'},
     {id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', note: {ja: '(バランス型)', en: '(balanced)'}, provider: 'gemini'},
-    {id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash-Lite', note: {ja: '(最速・最安)', en: '(fastest, cheapest)'}, provider: 'gemini'}
+    {id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash-Lite', note: {ja: '(最速・最安)', en: '(fastest, cheapest)'}, provider: 'gemini'},
+    {id: LOCAL_MODEL, name: 'Qwen3-Coder 480B', note: {ja: '(ローカルLLM)', en: '(local LLM)'}, provider: 'local'}
 ];
 
 const modelLabel = (m, lang) => `${m.name}${m.note[lang] || m.note.ja}`;
 
-const ApiKeyModal = ({lang = 'ja', initialApiKey, initialDeepSeekApiKey, initialOpenAIApiKey, initialGeminiApiKey, initialModel, onSave, onClose}) => {
+const ApiKeyModal = ({lang = 'ja', initialApiKey, initialDeepSeekApiKey, initialOpenAIApiKey, initialGeminiApiKey, initialLocalApiKey, initialModel, onSave, onClose}) => {
     const t = STRINGS[lang];
     const [value, setValue] = useState(initialApiKey || '');
     const [deepseekValue, setDeepseekValue] = useState(initialDeepSeekApiKey || '');
     const [openaiValue, setOpenaiValue] = useState(initialOpenAIApiKey || '');
     const [geminiValue, setGeminiValue] = useState(initialGeminiApiKey || '');
+    const [localValue, setLocalValue] = useState(initialLocalApiKey || '');
     const [model, setModelValue] = useState(initialModel || MODELS[0].id);
 
     const needsDeepSeek = isDeepSeekModel(model);
     const needsOpenAI = isOpenAIModel(model);
     const needsGemini = isGeminiModel(model);
+    const needsLocal = isLocalModel(model);
     const canSave = needsDeepSeek ? deepseekValue.trim() :
         needsOpenAI ? openaiValue.trim() :
-            needsGemini ? geminiValue.trim() : value.trim();
+            needsGemini ? geminiValue.trim() :
+                needsLocal ? localValue.trim() : value.trim();
 
     const save = () => {
         if (!canSave) return;
-        onSave(value.trim(), model, deepseekValue.trim(), openaiValue.trim(), geminiValue.trim());
+        onSave(value.trim(), model, deepseekValue.trim(), openaiValue.trim(), geminiValue.trim(), localValue.trim());
     };
 
     return (
@@ -72,10 +76,15 @@ const ApiKeyModal = ({lang = 'ja', initialApiKey, initialDeepSeekApiKey, initial
                                     <option key={m.id} value={m.id}>{modelLabel(m, lang)}</option>
                                 ))}
                             </optgroup>
+                            <optgroup label={t.localGroupLabel}>
+                                {MODELS.filter(m => m.provider === 'local').map(m => (
+                                    <option key={m.id} value={m.id}>{modelLabel(m, lang)}</option>
+                                ))}
+                            </optgroup>
                         </select>
                     </label>
 
-                    {!needsDeepSeek && !needsOpenAI && !needsGemini && (
+                    {!needsDeepSeek && !needsOpenAI && !needsGemini && !needsLocal && (
                         <>
                             <p style={{marginTop: '12px'}}>
                                 {t.anthropicDesc}
@@ -156,6 +165,25 @@ const ApiKeyModal = ({lang = 'ja', initialApiKey, initialDeepSeekApiKey, initial
                             <p className="as-modal-hint">
                                 {t.hintPrefix}<a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer">Google AI Studio</a>{t.hintSuffix}
                             </p>
+                        </>
+                    )}
+
+                    {needsLocal && (
+                        <>
+                            <p style={{marginTop: '12px'}}>
+                                {t.localDesc}
+                                {t.keyStoredNote}
+                            </p>
+                            <input
+                                type="password"
+                                className="as-modal-input"
+                                placeholder="xxxxxxxx-xxxx-..."
+                                value={localValue}
+                                autoFocus
+                                onChange={e => setLocalValue(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') save(); }}
+                            />
+                            <p className="as-modal-hint">{t.localHint}</p>
                         </>
                     )}
                 </div>

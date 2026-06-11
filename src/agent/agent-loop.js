@@ -34,12 +34,19 @@ const MODEL_STORAGE_KEY = 'agent-scratch-model';
 const DEEPSEEK_API_KEY_STORAGE_KEY = 'agent-scratch-deepseek-api-key';
 const OPENAI_API_KEY_STORAGE_KEY = 'agent-scratch-openai-api-key';
 const GEMINI_API_KEY_STORAGE_KEY = 'agent-scratch-gemini-api-key';
+const LOCAL_API_KEY_STORAGE_KEY = 'agent-scratch-local-api-key';
 
 // ローカル開発用キー(.env から webpack DefinePlugin で注入。未設定なら空文字)
 export const DEV_ANTHROPIC_KEY = process.env.DEV_ANTHROPIC_API_KEY || '';
 const DEV_DEEPSEEK_KEY = process.env.DEV_DEEPSEEK_API_KEY || '';
 const DEV_OPENAI_KEY = process.env.DEV_OPENAI_API_KEY || '';
 const DEV_GEMINI_KEY = process.env.DEV_GEMINI_API_KEY || '';
+const DEV_LOCAL_KEY = process.env.DEV_LOCAL_API_KEY || '';
+
+// ローカルLLM(OpenAI互換プロキシ経由の Qwen3-Coder)。
+// 接続先は固定。API キーはユーザーが設定画面で入力するか .env の DEV_LOCAL_API_KEY で渡す。
+export const LOCAL_BASE_URL = 'https://tukumana.si.aoyama.ac.jp/ai-proxy/proxy';
+export const LOCAL_MODEL = 'Qwen3-Coder-480B-A35B-Instruct-FP8';
 
 export const DEFAULT_MODEL = 'deepseek-chat'; // デフォルトモデル
 export const TRIAL_MODEL = 'deepseek-chat';   // お試しモードで使うモデル
@@ -54,6 +61,9 @@ export const isOpenAIModel = model => model && model.startsWith('gpt-');
 export const getGeminiApiKey = () => localStorage.getItem(GEMINI_API_KEY_STORAGE_KEY) || DEV_GEMINI_KEY;
 export const setGeminiApiKey = key => localStorage.setItem(GEMINI_API_KEY_STORAGE_KEY, key);
 export const isGeminiModel = model => model && model.startsWith('gemini-');
+export const getLocalApiKey = () => localStorage.getItem(LOCAL_API_KEY_STORAGE_KEY) || DEV_LOCAL_KEY;
+export const setLocalApiKey = key => localStorage.setItem(LOCAL_API_KEY_STORAGE_KEY, key);
+export const isLocalModel = model => model === LOCAL_MODEL;
 
 const MAX_ITERATIONS = 30;
 const MAX_TOKENS = 16000;
@@ -327,7 +337,8 @@ export const runAgent = async ({
     const model = getModel();
 
     // お試しモード: キー未入力 + プロキシURL設定済み + トークン保存済み → DeepSeek プロキシ経由
-    const useTrial = !apiKey && !getDeepSeekApiKey() && !getOpenAIApiKey() && !getGeminiApiKey() && isTrialAvailable();
+    const useTrial = !apiKey && !getDeepSeekApiKey() && !getOpenAIApiKey() &&
+        !getGeminiApiKey() && !getLocalApiKey() && isTrialAvailable();
     if (useTrial) {
         return runOpenAICompatAgent({
             apiKey: getTrialToken(),
@@ -358,6 +369,23 @@ export const runAgent = async ({
         return runOpenAICompatAgent({
             apiKey: openaiApiKey,
             baseURL: 'https://api.openai.com/v1',
+            vm, userText, apiMessages, signal, blocksEnabled, lang, getWorkspace,
+            onAssistantStart, onAssistantDelta, onAssistantText,
+            onToolStart, onToolEnd, onToolDrafting
+        });
+    }
+
+    // ローカルLLM(OpenAI互換プロキシ経由の Qwen3-Coder)も同じループへ
+    if (isLocalModel(model)) {
+        const localApiKey = getLocalApiKey();
+        if (!localApiKey) throw new AuthError(lang === 'en' ? 'No local LLM API key is set. Please set it from ⚙️.' : 'ローカルLLMのAPIキーが設定されていません。⚙️ から設定してください。');
+        return runOpenAICompatAgent({
+            apiKey: localApiKey,
+            baseURL: LOCAL_BASE_URL,
+            model: LOCAL_MODEL,
+            // プロキシの CORS 許可ヘッダは authorization/content-type のみ。SDK の
+            // x-stainless-* ヘッダが付くと preflight で弾かれるため除去する(Gemini と同様)
+            stripSdkHeaders: true,
             vm, userText, apiMessages, signal, blocksEnabled, lang, getWorkspace,
             onAssistantStart, onAssistantDelta, onAssistantText,
             onToolStart, onToolEnd, onToolDrafting

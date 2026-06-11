@@ -43,6 +43,9 @@ export const STRINGS = {
         deepseekDesc: 'DeepSeek API キーを入力してください。',
         openaiDesc: 'OpenAI API キーを入力してください。',
         geminiDesc: 'Google Gemini API キーを入力してください。',
+        localGroupLabel: 'ローカルLLM',
+        localDesc: 'ローカルLLM(OpenAI互換プロキシ経由の Qwen3-Coder)の API キーを入力してください。',
+        localHint: 'API キーは接続先の提供者(学校など)から配布されたものを使ってください。',
         hintPrefix: 'API キーは ',
         hintSuffix: ' で取得できます。'
     },
@@ -81,6 +84,9 @@ export const STRINGS = {
         deepseekDesc: 'Enter your DeepSeek API key.',
         openaiDesc: 'Enter your OpenAI API key.',
         geminiDesc: 'Enter your Google Gemini API key.',
+        localGroupLabel: 'Local LLM',
+        localDesc: 'Enter the API key for the local LLM (Qwen3-Coder via an OpenAI-compatible proxy).',
+        localHint: 'Use the API key provided by the endpoint operator (e.g. your school).',
         hintPrefix: 'You can get an API key at ',
         hintSuffix: '.'
     }

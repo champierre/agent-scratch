@@ -3,7 +3,7 @@ import scratchblocks from 'scratchblocks';
 import jaLocale from 'scratchblocks/locales/ja.json';
 import jaHiraLocale from 'scratchblocks/locales/ja-Hira.json';
 import {BLOCK_LABELS, getBlockLabel, findOpcodeByJaName, isRedundantJaAnnotation} from '../../agent/block-labels.js';
-import {isDeepSeekModel, isOpenAIModel, isGeminiModel} from '../../agent/agent-loop';
+import {isDeepSeekModel, isOpenAIModel, isGeminiModel, isLocalModel} from '../../agent/agent-loop';
 import {STRINGS, SUGGESTIONS_BY_LANG, draftingChars, pricingLabel} from '../../i18n';
 import './chat-panel.css';
 
@@ -263,6 +263,7 @@ const PRICING_PAGES = {
     gemini: {label: 'Google Gemini', url: 'https://ai.google.dev/gemini-api/docs/pricing'}
 };
 const pricingPageFor = model => {
+    if (isLocalModel(model)) return null; // ローカルLLMは公開料金表がないためリンクを出さない
     if (isDeepSeekModel(model)) return PRICING_PAGES.deepseek;
     if (isOpenAIModel(model)) return PRICING_PAGES.openai;
     if (isGeminiModel(model)) return PRICING_PAGES.gemini;
@@ -386,9 +387,11 @@ const ChatPanel = ({
                 {currentModel && (
                     <div className="as-chat-cost">
                         <span style={{marginRight: '6px', opacity: 0.7}}>[{currentModel}]</span>
-                        <a href={pricingPageFor(currentModel).url} target="_blank" rel="noreferrer">
-                            {pricingLabel(lang, pricingPageFor(currentModel).label)}
-                        </a>
+                        {pricingPageFor(currentModel) && (
+                            <a href={pricingPageFor(currentModel).url} target="_blank" rel="noreferrer">
+                                {pricingLabel(lang, pricingPageFor(currentModel).label)}
+                            </a>
+                        )}
                     </div>
                 )}
                 {trialMode && (
