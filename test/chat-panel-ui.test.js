@@ -24,7 +24,7 @@ const baseProps = () => ({
     drafting: null,
     hasApiKey: true,
     trialMode: false,
-    currentModel: 'deepseek-chat',
+    currentModel: 'deepseek-v4-flash',
     blocksEnabled: true,
     onSend: () => {},
     onStop: () => {},

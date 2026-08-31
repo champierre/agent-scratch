@@ -6,7 +6,7 @@ Scratch エディタに組み込まれた AI エージェント。ユーザー�
 
 - **フロントエンド**: React + webpack、Scratch GUI を組み込み
 - **AI**: Anthropic Claude API / DeepSeek API / OpenAI API / Google Gemini API（Anthropic 以外は OpenAI 互換ループを共用。Gemini は generativelanguage.googleapis.com の OpenAI 互換エンドポイント）
-- **試用モード**: Cloudflare Worker プロキシ経由（DeepSeek deepseek-chat）
+- **試用モード**: Cloudflare Worker プロキシ経由（DeepSeek deepseek-v4-flash）
 - **デプロイ**: GitHub Pages（`npm run build` → `build/` ディレクトリ）
 
 ## 開発環境のセットアップ

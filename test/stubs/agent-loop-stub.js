@@ -8,7 +8,7 @@ export const __reset = () => { lastRunAgentArgs = null; };
 
 export const runAgent = async opts => { lastRunAgentArgs = opts; };
 
-export const getModel = () => 'deepseek-chat';
+export const getModel = () => 'deepseek-v4-flash';
 export const setModel = () => {};
 export const isTrialAvailable = () => false;
 export const getDeepSeekApiKey = () => 'dummy-key';

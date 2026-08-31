@@ -6,9 +6,10 @@
 //   npx wrangler deploy
 //   npx wrangler secret put DEEPSEEK_API_KEY   # 支出上限付きのキーを推奨
 
-// お試しモードは低コストの deepseek-chat のみ許可
+// お試しモードは低コストの deepseek-v4-flash のみ許可
+// (旧 deepseek-chat / deepseek-reasoner は 2026-07-24 に DeepSeek 側で廃止)
 const ALLOWED_MODELS = [
-    'deepseek-chat'
+    'deepseek-v4-flash'
 ];
 
 const MAX_TOKENS_LIMIT = 16000;
