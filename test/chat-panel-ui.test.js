@@ -76,6 +76,52 @@ const baseProps = () => ({
     console.log('test4 OK: lang=en で英語UI');
 }
 
+// --- テスト5: opcode(値) が入力欄に値の入ったブロック画像になる ---
+// 「motion_movesteps を置いて数字を5にする」ではなく、完成形の (5) 歩動かす を見せたい
+{
+    globalThis.__sbParsed = [];
+    const {container} = render(React.createElement(ChatPanel, {
+        ...baseProps(),
+        collapsed: false,
+        messages: [{role: 'assistant', text: 'motion_movesteps(5) をつなげます'}]
+    }));
+    assert.ok(globalThis.__sbParsed.includes('(5) 歩動かす'),
+        `入力欄に5が入ったラベルで描画される (実際: ${JSON.stringify(globalThis.__sbParsed)})`);
+    // 値の括弧は画像に取り込まれ、本文には残らない
+    assert.ok(!container.textContent.includes('(5)'), '本文に (5) が二重表示されない');
+    assert.ok(!container.textContent.includes('motion_movesteps'), 'opcode が生のまま残らない');
+    cleanup();
+    console.log('test5 OK: opcode(値) が値入りブロック画像になる');
+}
+
+// --- テスト6: 差し込めない値では既定ラベルに戻り、括弧は本文に残す ---
+{
+    globalThis.__sbParsed = [];
+    const {container} = render(React.createElement(ChatPanel, {
+        ...baseProps(),
+        collapsed: false,
+        messages: [{role: 'assistant', text: 'motion_movesteps(たくさん) です'}]
+    }));
+    assert.ok(globalThis.__sbParsed.includes('(10) 歩動かす'), '既定ラベルにフォールバックする');
+    assert.ok(container.textContent.includes('たくさん'), '解釈できない括弧は本文に残す');
+    cleanup();
+    console.log('test6 OK: 差し込めない値は既定ラベルにフォールバック');
+}
+
+// --- テスト7: 従来どおり「日本語名の括弧書き」は冗長として読み飛ばす ---
+{
+    globalThis.__sbParsed = [];
+    const {container} = render(React.createElement(ChatPanel, {
+        ...baseProps(),
+        collapsed: false,
+        messages: [{role: 'assistant', text: 'motion_movesteps(10歩動かす) を置く'}]
+    }));
+    assert.ok(globalThis.__sbParsed.includes('(10) 歩動かす'), '既定ラベルで描画される');
+    assert.ok(!container.textContent.includes('10歩動かす'), '同じ名前の括弧書きは消える');
+    cleanup();
+    console.log('test7 OK: 日本語名の括弧書きは従来どおり読み飛ばす');
+}
+
 console.log('chat-panel-ui ALL TESTS PASSED');
 // React scheduler / jsdom がイベントループにハンドルを残しプロセスが
 // 自然終了しないため、明示的に終了する(CIのハング防止)

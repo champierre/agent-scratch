@@ -380,3 +380,66 @@ export const isRedundantJaAnnotation = (text, opcode) => {
     if (cand.length > key.length * 3 + 10) return false; // 長すぎる説明文は別物とみなす
     return isSubsequence(key, cand);
 };
+
+// ---- ラベルの入力欄に値を差し込む ----
+// Scratch のブロックには編集できる入力欄がある(「(10) 歩動かす」の 10 など)。
+// 「5歩動かす」を説明したいのに (10) のまま表示されると分かりにくいので、
+// AI が opcode に添えた値(motion_movesteps(5))をその入力欄に差し込む。
+//
+// 対象は数値入力 (10) と文字入力 [Hello!] のみ。
+// ドロップダウン [スペース v] は Scratch 上でも自由入力ではないため対象外にする
+// (許可値を検証せずに差し込むと、存在しない選択肢のブロックを描いてしまう)。
+// 検出できない・値が不正な場合は null を返し、呼び出し側はデフォルトの
+// ラベルにフォールバックする(誤ったブロックを描くくらいなら従来表示のまま)。
+// 空の () は operator_not の条件欄のようにブロックを入れる穴であって
+// 値を打ち込む欄ではないため、数字が入っているものだけを入力欄として扱う
+const SLOT_RE = /\((-?\d+(?:\.\d+)?)\)|\[([^\]]*)\]/g;
+const NUMERIC_VALUE_RE = /^-?\d+(?:\.\d+)?$/;
+// DSL を壊す文字(括弧・山括弧・改行)を含む値は差し込まない
+const UNSAFE_VALUE_RE = /[[\]()<>\n]/;
+const MAX_VALUE_LEN = 40;
+
+// ラベル中の編集可能な入力欄を前から順に返す
+const findEditableSlots = label => {
+    const slots = [];
+    let m;
+    SLOT_RE.lastIndex = 0;
+    while ((m = SLOT_RE.exec(label)) !== null) {
+        const numeric = m[1] !== undefined;
+        // [スペース v] のようなドロップダウンは入力欄ではない
+        if (!numeric && / v$/.test(m[2])) continue;
+        slots.push({start: m.index, end: m.index + m[0].length, numeric});
+    }
+    return slots;
+};
+
+// 入力欄が1つのブロックは括弧の中身をそのまま1つの値として扱う
+// (looks_say(こんにちは、世界) の読点で分割してしまわないため)。
+// 2つ以上のときだけカンマ/読点で区切る。
+const splitArgText = (argText, count) => (count === 1
+    ? [argText.trim()]
+    : argText.split(/[,、，]/).map(s => s.trim()));
+
+export const fillBlockLabel = (label, argText) => {
+    if (!label || typeof argText !== 'string') return null;
+    const slots = findEditableSlots(label);
+    if (slots.length === 0) return null;
+
+    const values = splitArgText(argText, slots.length);
+    if (values.length !== slots.length) return null;
+
+    for (let i = 0; i < slots.length; i++) {
+        const v = values[i];
+        if (!v || v.length > MAX_VALUE_LEN || UNSAFE_VALUE_RE.test(v)) return null;
+        if (slots[i].numeric && !NUMERIC_VALUE_RE.test(v)) return null;
+    }
+
+    // 後ろの欄から置換して、前の欄のインデックスをずらさない
+    let out = label;
+    for (let i = slots.length - 1; i >= 0; i--) {
+        const {start, end, numeric} = slots[i];
+        const filled = numeric ? `(${values[i]})` : `[${values[i]}]`;
+        out = out.slice(0, start) + filled + out.slice(end);
+    }
+    return out;
+};

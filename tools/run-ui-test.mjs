@@ -16,7 +16,8 @@ const stubScratchblocks = {
         build.onResolve({filter: /^scratchblocks$/}, () => ({path: 'sb', namespace: 'sbstub'}));
         build.onLoad({filter: /.*/, namespace: 'sbstub'}, () => ({
             contents: 'export function loadLanguages(){}\n' +
-                'export function parse(){return {};}\n' +
+                // parse に渡されたラベルを記録し、テストから検証できるようにする
+                'export function parse(label){(globalThis.__sbParsed ||= []).push(label); return {};}\n' +
                 'export function render(){return document.createElementNS("http://www.w3.org/2000/svg","svg");}\n' +
                 'export default {loadLanguages, parse, render};'
         }));
