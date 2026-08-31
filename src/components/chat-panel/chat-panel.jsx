@@ -2,7 +2,7 @@ import React, {useEffect, useRef, useState} from 'react';
 import scratchblocks from 'scratchblocks';
 import jaLocale from 'scratchblocks/locales/ja.json';
 import jaHiraLocale from 'scratchblocks/locales/ja-Hira.json';
-import {BLOCK_LABELS, getBlockLabel, findOpcodeByJaName, isRedundantJaAnnotation} from '../../agent/block-labels.js';
+import {BLOCK_LABELS, getBlockLabel, fillBlockLabel, findOpcodeByJaName, isRedundantJaAnnotation} from '../../agent/block-labels.js';
 import {isDeepSeekModel, isOpenAIModel, isGeminiModel} from '../../agent/agent-loop';
 import {STRINGS, SUGGESTIONS_BY_LANG, draftingChars, pricingLabel} from '../../i18n';
 import './chat-panel.css';
@@ -12,6 +12,8 @@ scratchblocks.loadLanguages({'ja': jaLocale, 'ja-Hira': jaHiraLocale});
 
 // Scratch の言語(ja|en)から scratchblocks に渡す languages を決定
 const getSbLanguages = lang => (lang === 'ja' ? ['ja', 'en'] : ['en']);
+// scratchblocks のロケールは ja のとき日本語、それ以外は英語ラベル
+const getSbLang = lang => (lang === 'ja' ? 'ja' : 'en');
 
 // opcode を scratchblocks SVG に変換するコンポーネント
 //
@@ -30,11 +32,11 @@ const OPCODE_RE = new RegExp(
     'g'
 );
 
-const BlockImage = ({opcode, keyStr, lang = 'ja'}) => {
+const BlockImage = ({opcode, keyStr, lang = 'ja', argText = null}) => {
     const ref = useRef(null);
-    // scratchblocks のロケールは ja のとき日本語、それ以外は英語ラベル
-    const sbLang = lang === 'ja' ? 'ja' : 'en';
-    const label = getBlockLabel(opcode, sbLang);
+    const baseLabel = getBlockLabel(opcode, getSbLang(lang));
+    // argText があれば編集可能な入力欄に差し込む(差し込めなければ既定のラベル)
+    const label = (argText && fillBlockLabel(baseLabel, argText)) || baseLabel;
     // 改行を含むC字型ブロック(if/repeat等)はinline: falseでレンダリングしないと一行になる
     const isBlockShape = label ? label.includes('\n') : false;
 
@@ -65,13 +67,20 @@ const BlockImage = ({opcode, keyStr, lang = 'ja'}) => {
 // ブロック画像に変換する(opcodeで書かないモデルへのロジック側の救済)
 const JA_QUOTED_RE = /「([^「」]{2,40})」/g;
 
-// ブロック画像の直後に「(同じブロックの日本語名)」が続く場合は冗長なので読み飛ばす
-// 例: motion_movesteps(10歩動かす) → 画像のみ表示
+// opcode の直後の括弧には2通りの意味がある。
+//   (a) 同じブロックの日本語名 → 冗長なので読み飛ばす   例: motion_movesteps(10歩動かす)
+//   (b) 入力欄に入れる値       → ブロック画像に反映する 例: motion_movesteps(5)
+// (a) を先に判定して従来の挙動を保ち、(a) でなければ (b) として解釈する。
+// (b) として差し込めない場合は括弧を消費せず、本文としてそのまま残す。
 const PAREN_ANNOTATION_RE = /^\s*[（(]([^（）()]{1,50})[）)]/;
-const skipRedundantAnnotation = (text, pos, opcode) => {
+const readTrailingParen = (text, pos, opcode, lang) => {
     const m = text.slice(pos).match(PAREN_ANNOTATION_RE);
-    if (m && isRedundantJaAnnotation(m[1], opcode)) return pos + m[0].length;
-    return pos;
+    if (!m) return {argText: null, next: pos};
+    const inner = m[1];
+    const end = pos + m[0].length;
+    if (isRedundantJaAnnotation(inner, opcode)) return {argText: null, next: end};
+    if (fillBlockLabel(getBlockLabel(opcode, getSbLang(lang)), inner)) return {argText: inner, next: end};
+    return {argText: null, next: pos};
 };
 
 const renderJaQuotedBlocks = (text, keyPrefix, lang) => {
@@ -83,8 +92,9 @@ const renderJaQuotedBlocks = (text, keyPrefix, lang) => {
         const opcode = findOpcodeByJaName(match[1]);
         if (!opcode) continue;
         if (match.index > last) parts.push(text.slice(last, match.index));
-        parts.push(<BlockImage key={`${keyPrefix}-ja-${match.index}`} opcode={opcode} keyStr={`${keyPrefix}-ja-${match.index}`} lang={lang} />);
-        last = skipRedundantAnnotation(text, match.index + match[0].length, opcode);
+        const trailing = readTrailingParen(text, match.index + match[0].length, opcode, lang);
+        parts.push(<BlockImage key={`${keyPrefix}-ja-${match.index}`} opcode={opcode} keyStr={`${keyPrefix}-ja-${match.index}`} lang={lang} argText={trailing.argText} />);
+        last = trailing.next;
         JA_QUOTED_RE.lastIndex = last;
     }
     if (last < text.length) parts.push(text.slice(last));
@@ -100,8 +110,9 @@ const renderWithBlocks = (text, keyPrefix, lang) => {
         const opcode = match[1];
         if (!BLOCK_LABELS[opcode]) continue;
         if (match.index > last) parts.push(...renderJaQuotedBlocks(text.slice(last, match.index), `${keyPrefix}-${last}`, lang));
-        parts.push(<BlockImage key={`${keyPrefix}-blk-${match.index}`} opcode={opcode} keyStr={`${keyPrefix}-${match.index}`} lang={lang} />);
-        last = skipRedundantAnnotation(text, match.index + match[0].length, opcode);
+        const trailing = readTrailingParen(text, match.index + match[0].length, opcode, lang);
+        parts.push(<BlockImage key={`${keyPrefix}-blk-${match.index}`} opcode={opcode} keyStr={`${keyPrefix}-${match.index}`} lang={lang} argText={trailing.argText} />);
+        last = trailing.next;
         OPCODE_RE.lastIndex = last;
     }
     if (last < text.length) parts.push(...renderJaQuotedBlocks(text.slice(last), `${keyPrefix}-${last}`, lang));
@@ -117,7 +128,12 @@ const renderInline = (text, keyPrefix, lang) => {
         } else if (/^`[^`]+`$/.test(seg)) {
             // バッククォート内は opcode として扱いブロック画像に変換
             const inner = seg.slice(1, -1);
-            if (BLOCK_LABELS[inner]) {
+            // `motion_movesteps` だけでなく `motion_movesteps(5)` の形も受ける
+            const withArg = inner.match(/^([a-zA-Z0-9_]+)\s*[（(]([^（）()]{1,50})[）)]$/);
+            if (withArg && BLOCK_LABELS[withArg[1]] &&
+                fillBlockLabel(getBlockLabel(withArg[1], getSbLang(lang)), withArg[2])) {
+                parts.push(<BlockImage key={`${keyPrefix}-${i}`} opcode={withArg[1]} keyStr={`${keyPrefix}-${i}`} lang={lang} argText={withArg[2]} />);
+            } else if (BLOCK_LABELS[inner]) {
                 parts.push(<BlockImage key={`${keyPrefix}-${i}`} opcode={inner} keyStr={`${keyPrefix}-${i}`} lang={lang} />);
             } else {
                 parts.push(<code key={`${keyPrefix}-${i}`}>{inner}</code>);
