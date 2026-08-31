@@ -5,8 +5,8 @@ import './api-key-modal.css';
 
 // label はモデル名 + 言語別の補足注記({ja, en})
 const MODELS = [
-    {id: 'deepseek-chat', name: 'DeepSeek V3', note: {ja: '(低コスト・高性能) ★推奨', en: '(low cost, high performance) ★recommended'}, provider: 'deepseek'},
-    {id: 'deepseek-reasoner', name: 'DeepSeek R1', note: {ja: '(推論特化)', en: '(reasoning-focused)'}, provider: 'deepseek'},
+    {id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', note: {ja: '(低コスト・高性能) ★推奨', en: '(low cost, high performance) ★recommended'}, provider: 'deepseek'},
+    {id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', note: {ja: '(最高性能・高コスト)', en: '(top performance, high cost)'}, provider: 'deepseek'},
     {id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5', note: {ja: '(最速・最安)', en: '(fastest, cheapest)'}, provider: 'anthropic'},
     {id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', note: {ja: '(バランス型)', en: '(balanced)'}, provider: 'anthropic'},
     {id: 'claude-opus-4-8', name: 'Claude Opus 4.8', note: {ja: '(最高性能・高コスト)', en: '(top performance, high cost)'}, provider: 'anthropic'},

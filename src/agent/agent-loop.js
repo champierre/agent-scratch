@@ -41,9 +41,21 @@ const DEV_DEEPSEEK_KEY = process.env.DEV_DEEPSEEK_API_KEY || '';
 const DEV_OPENAI_KEY = process.env.DEV_OPENAI_API_KEY || '';
 const DEV_GEMINI_KEY = process.env.DEV_GEMINI_API_KEY || '';
 
-export const DEFAULT_MODEL = 'deepseek-chat'; // デフォルトモデル
-export const TRIAL_MODEL = 'deepseek-chat';   // お試しモードで使うモデル
-export const getModel = () => localStorage.getItem(MODEL_STORAGE_KEY) || DEFAULT_MODEL;
+export const DEFAULT_MODEL = 'deepseek-v4-flash'; // デフォルトモデル
+export const TRIAL_MODEL = 'deepseek-v4-flash';   // お試しモードで使うモデル
+
+// 廃止されたモデルID → 後継IDへの読み替え表。
+// deepseek-chat / deepseek-reasoner は 2026-07-24 に DeepSeek 側で廃止済みで、
+// localStorage に旧IDが残っている既存ユーザーはそのままだと API エラーになる。
+// 「ロジックで確実に」— 選択肢から消すだけでなく読み出し時に必ず変換する。
+// 旧IDは廃止までのあいだ v4-flash の非思考/思考モードに転送されていたため、
+// どちらも v4-flash に寄せる(高コストな v4-pro へ勝手に上げない)。
+const LEGACY_MODEL_MAP = {
+    'deepseek-chat': 'deepseek-v4-flash',
+    'deepseek-reasoner': 'deepseek-v4-flash'
+};
+export const migrateModel = model => LEGACY_MODEL_MAP[model] || model;
+export const getModel = () => migrateModel(localStorage.getItem(MODEL_STORAGE_KEY)) || DEFAULT_MODEL;
 export const setModel = model => localStorage.setItem(MODEL_STORAGE_KEY, model);
 export const getDeepSeekApiKey = () => localStorage.getItem(DEEPSEEK_API_KEY_STORAGE_KEY) || DEV_DEEPSEEK_KEY;
 export const setDeepSeekApiKey = key => localStorage.setItem(DEEPSEEK_API_KEY_STORAGE_KEY, key);
