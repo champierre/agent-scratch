@@ -5,12 +5,32 @@
 //   cd worker
 //   npx wrangler deploy
 //   npx wrangler secret put DEEPSEEK_API_KEY   # 支出上限付きのキーを推奨
+//   npx wrangler secret put TRUSTED_IPS        # (任意) パスワードなし・制限なしで通すグローバルIP(カンマ区切り)
 
 // お試しモードは低コストの deepseek-v4-flash のみ許可
 // (旧 deepseek-chat / deepseek-reasoner は 2026-07-24 に DeepSeek 側で廃止)
 const ALLOWED_MODELS = [
     'deepseek-v4-flash'
 ];
+
+// 信頼済みネットワーク(TRUSTED_IPS に載っているグローバルIP)からのアクセスで許可するモデル。
+// キーを入れた状態と同等に使えるよう v4-pro も許可する。
+const TRUSTED_ALLOWED_MODELS = [
+    'deepseek-v4-flash',
+    'deepseek-v4-pro'
+];
+
+// 接続元IPが信頼済みネットワークかどうか。
+// ブラウザは SSID を取得できないため、Wi-Fi の判定は「その回線のグローバルIP」で行う。
+// CF-Connecting-IP は Cloudflare が付与するヘッダでクライアントからは偽装できない。
+// TRUSTED_IPS はカンマ区切りの完全一致(公開リポジトリに IP を載せないよう Secret で設定する)。
+export const isTrustedIp = (ip, trustedIps) => {
+    if (!ip) return false;
+    return String(trustedIps || '').split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
+        .includes(ip);
+};
 
 const MAX_TOKENS_LIMIT = 16000;
 
@@ -47,17 +67,28 @@ export default {
             return Response.json({error: 'origin not allowed'}, {status: 403, headers: cors.headers});
         }
 
-        // パスワード検証(TRIAL_PASSWORD が設定されている場合のみ有効)
+        const trusted = isTrustedIp(request.headers.get('CF-Connecting-IP'), env.TRUSTED_IPS);
+        const url = new URL(request.url);
+
+        // GET /network — 接続元が信頼済みネットワークかどうかを返す(パスワード不要)。
+        // フロントはこれを見て「キー未入力でも DeepSeek を使える」状態に切り替える。
+        if (request.method === 'GET' && url.pathname === '/network') {
+            return Response.json(
+                {trusted},
+                {headers: {...cors.headers, 'cache-control': 'no-store'}}
+            );
+        }
+
+        // パスワード検証(TRIAL_PASSWORD が設定されている場合のみ有効)。
+        // 信頼済みネットワークからはパスワードなしで通す。
         const trialPassword = env.TRIAL_PASSWORD || '';
-        if (trialPassword) {
+        if (trialPassword && !trusted) {
             const authHeader = request.headers.get('Authorization') || '';
             const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
             if (token !== trialPassword) {
                 return Response.json({error: 'unauthorized'}, {status: 401, headers: cors.headers});
             }
         }
-
-        const url = new URL(request.url);
 
         // GET /fetch-url?url=... — 外部URLのコンテンツをテキストで返す
         if (request.method === 'GET' && url.pathname === '/fetch-url') {
@@ -166,7 +197,8 @@ export default {
             return Response.json({error: 'invalid json'}, {status: 400, headers: cors.headers});
         }
 
-        if (!ALLOWED_MODELS.includes(body.model)) {
+        const allowedModels = trusted ? TRUSTED_ALLOWED_MODELS : ALLOWED_MODELS;
+        if (!allowedModels.includes(body.model)) {
             return Response.json({error: 'model not allowed'}, {status: 400, headers: cors.headers});
         }
         body.max_tokens = Math.min(body.max_tokens || MAX_TOKENS_LIMIT, MAX_TOKENS_LIMIT);

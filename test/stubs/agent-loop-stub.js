@@ -11,6 +11,7 @@ export const runAgent = async opts => { lastRunAgentArgs = opts; };
 export const getModel = () => 'deepseek-v4-flash';
 export const setModel = () => {};
 export const isTrialAvailable = () => false;
+export const checkTrustedNetwork = async () => false;
 export const getDeepSeekApiKey = () => 'dummy-key';
 export const setDeepSeekApiKey = () => {};
 export const isDeepSeekModel = m => !!m && m.startsWith('deepseek-');

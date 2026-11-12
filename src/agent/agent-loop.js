@@ -30,6 +30,22 @@ export const getTrialToken = () => localStorage.getItem(TRIAL_TOKEN_KEY) || '';
 // TRIAL_PROXY_URL が設定されており、かつトークンが保存済みの場合のみ試用モード有効
 export const isTrialAvailable = () => Boolean(TRIAL_PROXY_URL && getTrialToken());
 
+// 信頼済みネットワーク(Worker の TRUSTED_IPS に載っている回線)からのアクセスかを問い合わせる。
+// ブラウザは SSID を読めないので、判定は Worker が接続元グローバルIPで行う。
+// 回線は切り替わりうるので localStorage には保存しない(結果は呼び出し側の state が単一の真実)。
+export const checkTrustedNetwork = async () => {
+    if (!TRIAL_PROXY_URL) return false;
+    try {
+        const base = TRIAL_PROXY_URL.replace(/\/(v1\/)?chat\/completions$/, '').replace(/\/$/, '');
+        const res = await fetch(`${base}/network`, {cache: 'no-store'});
+        if (!res.ok) return false;
+        const data = await res.json();
+        return data.trusted === true;
+    } catch (e) {
+        return false;
+    }
+};
+
 const MODEL_STORAGE_KEY = 'agent-scratch-model';
 const DEEPSEEK_API_KEY_STORAGE_KEY = 'agent-scratch-deepseek-api-key';
 const OPENAI_API_KEY_STORAGE_KEY = 'agent-scratch-openai-api-key';
@@ -327,6 +343,7 @@ export const runAgent = async ({
     apiMessages,
     signal,
     blocksEnabled = true,
+    networkTrusted = false,
     lang = 'ja',
     getWorkspace,
     onAssistantStart,
@@ -337,6 +354,21 @@ export const runAgent = async ({
     onToolDrafting
 }) => {
     const model = getModel();
+
+    // 信頼済みネットワーク: 自分の DeepSeek キーが無くても、DeepSeek モデルは Worker 経由で
+    // キーを入れた状態と同等(選択中のモデル・ブロック操作可)に使える。キーは Worker 側にあり
+    // ブラウザには渡らない。自分のキーがあるならそちらを優先する。
+    if (networkTrusted && isDeepSeekModel(model) && !getDeepSeekApiKey()) {
+        return runOpenAICompatAgent({
+            // OpenAI SDK は空の apiKey を拒否するためダミー値(Worker は接続元IPで認可する)
+            apiKey: getTrialToken() || 'trusted-network',
+            baseURL: TRIAL_PROXY_URL,
+            model,
+            vm, userText, apiMessages, signal, blocksEnabled, lang, getWorkspace,
+            onAssistantStart, onAssistantDelta, onAssistantText,
+            onToolStart, onToolEnd, onToolDrafting
+        });
+    }
 
     // お試しモード: キー未入力 + プロキシURL設定済み + トークン保存済み → DeepSeek プロキシ経由
     const useTrial = !apiKey && !getDeepSeekApiKey() && !getOpenAIApiKey() && !getGeminiApiKey() && isTrialAvailable();

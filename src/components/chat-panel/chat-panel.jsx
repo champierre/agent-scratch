@@ -306,6 +306,7 @@ const ChatPanel = ({
     drafting,
     hasApiKey,
     trialMode,
+    networkMode,
     currentModel,
     blocksEnabled,
     onSend,
@@ -410,6 +411,11 @@ const ChatPanel = ({
                 {trialMode && (
                     <div className="as-chat-trial" onClick={onOpenSettings}>
                         {t.trialBanner}
+                    </div>
+                )}
+                {networkMode && (
+                    <div className="as-chat-trial" onClick={onOpenSettings}>
+                        {t.networkBanner}
                     </div>
                 )}
                 {!canSend && (
