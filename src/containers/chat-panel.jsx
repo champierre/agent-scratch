@@ -1,8 +1,8 @@
-import React, {useCallback, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import ChatPanelComponent from '../components/chat-panel/chat-panel.jsx';
 import ApiKeyModal from '../components/api-key-modal/api-key-modal.jsx';
 import DisclosureModal from '../components/disclosure-modal/disclosure-modal.jsx';
-import {runAgent, AuthError, getModel, setModel, isTrialAvailable, getDeepSeekApiKey, setDeepSeekApiKey, isDeepSeekModel, getOpenAIApiKey, setOpenAIApiKey, isOpenAIModel, getGeminiApiKey, setGeminiApiKey, isGeminiModel, DEV_ANTHROPIC_KEY} from '../agent/agent-loop';
+import {runAgent, AuthError, getModel, setModel, isTrialAvailable, checkTrustedNetwork, getDeepSeekApiKey, setDeepSeekApiKey, isDeepSeekModel, isNetworkModel, getOpenAIApiKey, setOpenAIApiKey, isOpenAIModel, getGeminiApiKey, setGeminiApiKey, isGeminiModel, DEV_ANTHROPIC_KEY} from '../agent/agent-loop';
 import {STRINGS, errorPrefix} from '../i18n';
 import {getEditorWorkspace} from '../lib/editor-workspace';
 
@@ -25,6 +25,14 @@ const ChatPanel = ({vm, lang = 'ja', collapsed, onToggleCollapse}) => {
     // ツール入力生成中の進捗表示("ブロックを書いています (1200文字)" など)
     const [drafting, setDrafting] = useState(null);
     const [currentModel, setCurrentModel] = useState(() => getModel());
+    // 信頼済みネットワーク(Worker が接続元IPで判定)からのアクセスか。
+    // この state が単一の真実で、送信時は runAgent に引数で渡す。
+    const [networkTrusted, setNetworkTrusted] = useState(false);
+    useEffect(() => {
+        let alive = true;
+        checkTrustedNetwork().then(v => { if (alive) setNetworkTrusted(v); });
+        return () => { alive = false; };
+    }, []);
 
     // Anthropic API 形式の会話履歴(マルチターン対応)
     const apiMessagesRef = useRef([]);
@@ -100,6 +108,7 @@ const ChatPanel = ({vm, lang = 'ja', collapsed, onToggleCollapse}) => {
                 apiMessages: apiMessagesRef.current,
                 signal: controller.signal,
                 blocksEnabled: effectiveBlocksEnabled,
+                networkTrusted,
                 lang,
                 // 変数/リスト作成後にブロックパレットを再描画するため、編集中の
                 // Blockly ワークスペースを取得する関数を渡す(tool-handlers が利用)
@@ -131,7 +140,7 @@ const ChatPanel = ({vm, lang = 'ja', collapsed, onToggleCollapse}) => {
             finishStreaming();
             abortRef.current = null;
         }
-    }, [vm, apiKey, blocksEnabled, lang, t, appendMessage, finishLastTool, startAssistant, appendAssistantDelta, finishStreaming]);
+    }, [vm, apiKey, blocksEnabled, networkTrusted, lang, t, appendMessage, finishLastTool, startAssistant, appendAssistantDelta, finishStreaming]);
 
     const handleStop = useCallback(() => {
         if (abortRef.current) abortRef.current.abort();
@@ -156,7 +165,10 @@ const ChatPanel = ({vm, lang = 'ja', collapsed, onToggleCollapse}) => {
         setShowModal(false);
     }, []);
 
-    const trialModeNow = !apiKey && !deepseekApiKey && !openaiApiKey && !geminiApiKey && isTrialAvailable();
+    // 信頼済みネットワークで v4-flash を自分のキーなしで使っている状態
+    const networkModeNow = networkTrusted && isNetworkModel(currentModel) && !deepseekApiKey;
+    const trialModeNow = !networkModeNow &&
+        !apiKey && !deepseekApiKey && !openaiApiKey && !geminiApiKey && isTrialAvailable();
 
     return (
         <>
@@ -168,11 +180,12 @@ const ChatPanel = ({vm, lang = 'ja', collapsed, onToggleCollapse}) => {
                 running={running}
                 drafting={drafting}
                 hasApiKey={
-                    isDeepSeekModel(getModel()) ? !!deepseekApiKey :
+                    isDeepSeekModel(getModel()) ? (!!deepseekApiKey || networkModeNow) :
                         isOpenAIModel(getModel()) ? !!openaiApiKey :
                             isGeminiModel(getModel()) ? !!geminiApiKey : !!apiKey
                 }
                 trialMode={trialModeNow}
+                networkMode={networkModeNow}
                 currentModel={currentModel}
                 blocksEnabled={trialModeNow ? false : blocksEnabled}
                 onSend={handleSend}
@@ -198,6 +211,7 @@ const ChatPanel = ({vm, lang = 'ja', collapsed, onToggleCollapse}) => {
                     initialOpenAIApiKey={openaiApiKey}
                     initialGeminiApiKey={geminiApiKey}
                     initialModel={getModel()}
+                    networkTrusted={networkTrusted}
                     onSave={handleSaveApiKey}
                     onClose={() => setShowModal(false)}
                 />

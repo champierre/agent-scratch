@@ -1,5 +1,5 @@
 import React, {useState} from 'react';
-import {isDeepSeekModel, isOpenAIModel, isGeminiModel} from '../../agent/agent-loop';
+import {isDeepSeekModel, isNetworkModel, isOpenAIModel, isGeminiModel} from '../../agent/agent-loop';
 import {STRINGS} from '../../i18n';
 import './api-key-modal.css';
 
@@ -20,7 +20,7 @@ const MODELS = [
 
 const modelLabel = (m, lang) => `${m.name}${m.note[lang] || m.note.ja}`;
 
-const ApiKeyModal = ({lang = 'ja', initialApiKey, initialDeepSeekApiKey, initialOpenAIApiKey, initialGeminiApiKey, initialModel, onSave, onClose}) => {
+const ApiKeyModal = ({lang = 'ja', initialApiKey, initialDeepSeekApiKey, initialOpenAIApiKey, initialGeminiApiKey, initialModel, networkTrusted = false, onSave, onClose}) => {
     const t = STRINGS[lang];
     const [value, setValue] = useState(initialApiKey || '');
     const [deepseekValue, setDeepseekValue] = useState(initialDeepSeekApiKey || '');
@@ -31,7 +31,8 @@ const ApiKeyModal = ({lang = 'ja', initialApiKey, initialDeepSeekApiKey, initial
     const needsDeepSeek = isDeepSeekModel(model);
     const needsOpenAI = isOpenAIModel(model);
     const needsGemini = isGeminiModel(model);
-    const canSave = needsDeepSeek ? deepseekValue.trim() :
+    // 信頼済みネットワークでは v4-flash に限り DeepSeek キーなしでも保存できる
+    const canSave = needsDeepSeek ? (deepseekValue.trim() || (networkTrusted && isNetworkModel(model))) :
         needsOpenAI ? openaiValue.trim() :
             needsGemini ? geminiValue.trim() : value.trim();
 

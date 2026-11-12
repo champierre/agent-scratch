@@ -86,6 +86,7 @@ AI の挙動はシステムプロンプトの指示だけに頼るとランダ�
 - `/v1/chat/completions` と `/chat/completions` の両パスを受け付ける
   - OpenAI SDK は `baseURL` に `/v1` なしで渡すと `/chat/completions` にリクエストを送る
 - Secret: `DEEPSEEK_API_KEY`（旧: `ANTHROPIC_API_KEY`）
+- **信頼済みネットワーク**: Secret `TRUSTED_IPS`(グローバルIPのカンマ区切り)に載っている接続元は、パスワードなしで `deepseek-v4-flash` を使える(ブロック操作も可。コストを抑えるため `v4-pro` は不可)。ブラウザは SSID を取得できないので、Wi-Fi の判定は Worker が `CF-Connecting-IP` で行う。フロントは起動時に `GET /network` を問い合わせ(`checkTrustedNetwork`)、結果の state を `runAgent({networkTrusted})` に引数で渡す。IP は公開リポジトリに書かず Secret に置く
 - 変更後は `cd worker && npx wrangler deploy` で再デプロイ必要
 
 ## よくあるハマりポイント

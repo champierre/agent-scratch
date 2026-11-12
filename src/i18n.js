@@ -28,6 +28,7 @@ export const STRINGS = {
         toolCopied: 'コピーしました ✓',
         toolErrorTitle: 'クリックでエラー内容を表示',
         trialBanner: '🎁 お試しモードで利用中(DeepSeek V4 Flash・制限あり)。⚙️ から自分の API キーを設定できます',
+        networkBanner: '📶 このネットワークでは API キーなしで DeepSeek を利用できます',
         noKey: '⚙️ をクリックして API キーを設定してください',
         // コンテナのエラー文言
         vmNotReady: 'Scratch エディタの読み込みが完了していません。',
@@ -66,6 +67,7 @@ export const STRINGS = {
         toolCopied: 'Copied ✓',
         toolErrorTitle: 'Click to show the error details',
         trialBanner: '🎁 Using trial mode (DeepSeek V4 Flash, with limits). You can set your own API key from ⚙️',
+        networkBanner: '📶 On this network you can use DeepSeek without an API key',
         noKey: 'Click ⚙️ to set your API key',
         // Container error messages
         vmNotReady: 'The Scratch editor has not finished loading yet.',
