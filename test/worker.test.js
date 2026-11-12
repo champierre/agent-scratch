@@ -52,20 +52,22 @@ const main = async () => {
     res = await worker.fetch(req('/network'), env);
     assert.deepStrictEqual(await res.json(), {trusted: false});
 
-    // --- 信頼済みIP: パスワードなしで v4-flash / v4-pro が通る ---
-    for (const model of ['deepseek-v4-flash', 'deepseek-v4-pro']) {
-        upstreamCalls.length = 0;
-        res = await worker.fetch(chat(model, {ip: TRUSTED}), env);
-        assert.strictEqual(res.status, 200, model);
-        assert.strictEqual(upstreamCalls.length, 1);
-        assert.strictEqual(upstreamCalls[0].init.headers.authorization, 'Bearer sk-upstream');
-    }
-    // ダミーのトークンが付いていても通る(フロントは 'trusted-network' を送る)
-    res = await worker.fetch(chat('deepseek-v4-pro', {ip: TRUSTED, token: 'trusted-network'}), env);
+    // --- 信頼済みIP: パスワードなしで v4-flash が通る ---
+    upstreamCalls.length = 0;
+    res = await worker.fetch(chat('deepseek-v4-flash', {ip: TRUSTED}), env);
     assert.strictEqual(res.status, 200);
-    // 信頼済みでも許可外モデルは拒否
-    res = await worker.fetch(chat('gpt-5', {ip: TRUSTED}), env);
-    assert.strictEqual(res.status, 400);
+    assert.strictEqual(upstreamCalls.length, 1);
+    assert.strictEqual(upstreamCalls[0].init.headers.authorization, 'Bearer sk-upstream');
+    // ダミーのトークンが付いていても通る(フロントは 'trusted-network' を送る)
+    res = await worker.fetch(chat('deepseek-v4-flash', {ip: TRUSTED, token: 'trusted-network'}), env);
+    assert.strictEqual(res.status, 200);
+    // 信頼済みでも v4-flash 以外は拒否(高コストな v4-pro を含む)
+    upstreamCalls.length = 0;
+    for (const model of ['deepseek-v4-pro', 'gpt-5']) {
+        res = await worker.fetch(chat(model, {ip: TRUSTED}), env);
+        assert.strictEqual(res.status, 400, model);
+    }
+    assert.strictEqual(upstreamCalls.length, 0);
 
     // --- それ以外のIP: 従来どおり(パスワード必須・v4-flash のみ) ---
     upstreamCalls.length = 0;
@@ -81,7 +83,7 @@ const main = async () => {
 
     // --- TRUSTED_IPS 未設定なら誰も信頼済みにならない ---
     const noTrust = {...env, TRUSTED_IPS: undefined};
-    res = await worker.fetch(chat('deepseek-v4-pro', {ip: TRUSTED}), noTrust);
+    res = await worker.fetch(chat('deepseek-v4-flash', {ip: TRUSTED}), noTrust);
     assert.strictEqual(res.status, 401);
 
     console.log('worker.test.js: OK');

@@ -13,13 +13,6 @@ const ALLOWED_MODELS = [
     'deepseek-v4-flash'
 ];
 
-// 信頼済みネットワーク(TRUSTED_IPS に載っているグローバルIP)からのアクセスで許可するモデル。
-// キーを入れた状態と同等に使えるよう v4-pro も許可する。
-const TRUSTED_ALLOWED_MODELS = [
-    'deepseek-v4-flash',
-    'deepseek-v4-pro'
-];
-
 // 接続元IPが信頼済みネットワークかどうか。
 // ブラウザは SSID を取得できないため、Wi-Fi の判定は「その回線のグローバルIP」で行う。
 // CF-Connecting-IP は Cloudflare が付与するヘッダでクライアントからは偽装できない。
@@ -197,8 +190,8 @@ export default {
             return Response.json({error: 'invalid json'}, {status: 400, headers: cors.headers});
         }
 
-        const allowedModels = trusted ? TRUSTED_ALLOWED_MODELS : ALLOWED_MODELS;
-        if (!allowedModels.includes(body.model)) {
+        // 信頼済みネットワークでもモデルは同じ(コストを抑えるため v4-flash のみ)
+        if (!ALLOWED_MODELS.includes(body.model)) {
             return Response.json({error: 'model not allowed'}, {status: 400, headers: cors.headers});
         }
         body.max_tokens = Math.min(body.max_tokens || MAX_TOKENS_LIMIT, MAX_TOKENS_LIMIT);

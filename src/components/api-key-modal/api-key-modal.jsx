@@ -1,5 +1,5 @@
 import React, {useState} from 'react';
-import {isDeepSeekModel, isOpenAIModel, isGeminiModel} from '../../agent/agent-loop';
+import {isDeepSeekModel, isNetworkModel, isOpenAIModel, isGeminiModel} from '../../agent/agent-loop';
 import {STRINGS} from '../../i18n';
 import './api-key-modal.css';
 
@@ -31,8 +31,8 @@ const ApiKeyModal = ({lang = 'ja', initialApiKey, initialDeepSeekApiKey, initial
     const needsDeepSeek = isDeepSeekModel(model);
     const needsOpenAI = isOpenAIModel(model);
     const needsGemini = isGeminiModel(model);
-    // 信頼済みネットワークでは DeepSeek キーなしでもモデルを切り替えて保存できる
-    const canSave = needsDeepSeek ? (deepseekValue.trim() || networkTrusted) :
+    // 信頼済みネットワークでは v4-flash に限り DeepSeek キーなしでも保存できる
+    const canSave = needsDeepSeek ? (deepseekValue.trim() || (networkTrusted && isNetworkModel(model))) :
         needsOpenAI ? openaiValue.trim() :
             needsGemini ? geminiValue.trim() : value.trim();
 

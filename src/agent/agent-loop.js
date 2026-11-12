@@ -59,6 +59,8 @@ const DEV_GEMINI_KEY = process.env.DEV_GEMINI_API_KEY || '';
 
 export const DEFAULT_MODEL = 'deepseek-v4-flash'; // デフォルトモデル
 export const TRIAL_MODEL = 'deepseek-v4-flash';   // お試しモードで使うモデル
+// 信頼済みネットワークでキーなし利用できるモデル(Worker の ALLOWED_MODELS と揃える)
+export const isNetworkModel = model => model === TRIAL_MODEL;
 
 // 廃止されたモデルID → 後継IDへの読み替え表。
 // deepseek-chat / deepseek-reasoner は 2026-07-24 に DeepSeek 側で廃止済みで、
@@ -355,10 +357,10 @@ export const runAgent = async ({
 }) => {
     const model = getModel();
 
-    // 信頼済みネットワーク: 自分の DeepSeek キーが無くても、DeepSeek モデルは Worker 経由で
-    // キーを入れた状態と同等(選択中のモデル・ブロック操作可)に使える。キーは Worker 側にあり
+    // 信頼済みネットワーク: 自分の DeepSeek キーが無くても、v4-flash は Worker 経由で
+    // キーを入れた状態と同等(ブロック操作可)に使える。キーは Worker 側にあり
     // ブラウザには渡らない。自分のキーがあるならそちらを優先する。
-    if (networkTrusted && isDeepSeekModel(model) && !getDeepSeekApiKey()) {
+    if (networkTrusted && isNetworkModel(model) && !getDeepSeekApiKey()) {
         return runOpenAICompatAgent({
             // OpenAI SDK は空の apiKey を拒否するためダミー値(Worker は接続元IPで認可する)
             apiKey: getTrialToken() || 'trusted-network',

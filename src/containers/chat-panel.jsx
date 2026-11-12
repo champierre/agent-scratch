@@ -2,7 +2,7 @@ import React, {useCallback, useEffect, useRef, useState} from 'react';
 import ChatPanelComponent from '../components/chat-panel/chat-panel.jsx';
 import ApiKeyModal from '../components/api-key-modal/api-key-modal.jsx';
 import DisclosureModal from '../components/disclosure-modal/disclosure-modal.jsx';
-import {runAgent, AuthError, getModel, setModel, isTrialAvailable, checkTrustedNetwork, getDeepSeekApiKey, setDeepSeekApiKey, isDeepSeekModel, getOpenAIApiKey, setOpenAIApiKey, isOpenAIModel, getGeminiApiKey, setGeminiApiKey, isGeminiModel, DEV_ANTHROPIC_KEY} from '../agent/agent-loop';
+import {runAgent, AuthError, getModel, setModel, isTrialAvailable, checkTrustedNetwork, getDeepSeekApiKey, setDeepSeekApiKey, isDeepSeekModel, isNetworkModel, getOpenAIApiKey, setOpenAIApiKey, isOpenAIModel, getGeminiApiKey, setGeminiApiKey, isGeminiModel, DEV_ANTHROPIC_KEY} from '../agent/agent-loop';
 import {STRINGS, errorPrefix} from '../i18n';
 import {getEditorWorkspace} from '../lib/editor-workspace';
 
@@ -165,8 +165,8 @@ const ChatPanel = ({vm, lang = 'ja', collapsed, onToggleCollapse}) => {
         setShowModal(false);
     }, []);
 
-    // 信頼済みネットワークで DeepSeek モデルを自分のキーなしで使っている状態
-    const networkModeNow = networkTrusted && isDeepSeekModel(currentModel) && !deepseekApiKey;
+    // 信頼済みネットワークで v4-flash を自分のキーなしで使っている状態
+    const networkModeNow = networkTrusted && isNetworkModel(currentModel) && !deepseekApiKey;
     const trialModeNow = !networkModeNow &&
         !apiKey && !deepseekApiKey && !openaiApiKey && !geminiApiKey && isTrialAvailable();
 
@@ -180,7 +180,7 @@ const ChatPanel = ({vm, lang = 'ja', collapsed, onToggleCollapse}) => {
                 running={running}
                 drafting={drafting}
                 hasApiKey={
-                    isDeepSeekModel(getModel()) ? (!!deepseekApiKey || networkTrusted) :
+                    isDeepSeekModel(getModel()) ? (!!deepseekApiKey || networkModeNow) :
                         isOpenAIModel(getModel()) ? !!openaiApiKey :
                             isGeminiModel(getModel()) ? !!geminiApiKey : !!apiKey
                 }
